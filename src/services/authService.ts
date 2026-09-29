@@ -39,9 +39,9 @@ export interface LoginResult {
 // ---------------------------------------------------------------------------
 
 const ROLE_LABEL_MAP: Record<UserRole, string> = {
-  ADMIN: "Admin",
-  DEVELOPER: "Developer",
-  MANAGER: "Project Manager",
+  ADMIN: "admin",
+  DEVELOPER: "developer",
+  MANAGER: "project_manager",
 };
 
 // ---------------------------------------------------------------------------
