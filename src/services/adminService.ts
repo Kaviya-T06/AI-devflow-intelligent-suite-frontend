@@ -1,34 +1,47 @@
 /**
- * Admin data service — currently backed by mock data.
- * Replace each function body with the real Supabase / FastAPI call when the DB is ready.
- * The function signatures MUST NOT change — only the implementation bodies.
+ * Admin data service — calls the real FastAPI backend.
+ * No mock data. All responses come from the Supabase PostgreSQL database.
  */
-import type { Profile, Project, Task, ActivityLog, WorkflowRisk, Repository } from "../types";
-import {
-  MOCK_USERS,
-  MOCK_PROJECTS,
-  MOCK_TASKS,
-  MOCK_ACTIVITY,
-  MOCK_RISKS,
-  MOCK_REPOSITORIES,
-  getMockDashboardStats,
-} from "./mockData";
+import type { Project, Task, ActivityLog, WorkflowRisk, Repository } from "../types";
+
+const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const BASE = `${API}/api/v1`;
+
+// ---------------------------------------------------------------------------
+// Shared fetch helper
+// ---------------------------------------------------------------------------
+
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem("access_token");
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options?.headers ?? {}),
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "API error");
+  }
+  return res.json() as Promise<T>;
+}
 
 // ---------------------------------------------------------------------------
 // Dashboard stats
 // ---------------------------------------------------------------------------
 
 export interface DashboardStats {
-  totalUsers: number;
+  totalUsers:     number;
   activeProjects: number;
-  openTasks: number;
-  openRisks: number;
+  openTasks:      number;
+  openRisks:      number;
   connectedRepos: number;
 }
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
-  // TODO: Replace with FastAPI call → GET /api/v1/dashboard/stats
-  return getMockDashboardStats();
+  return apiFetch<DashboardStats>("/dashboard/stats");
 }
 
 // ---------------------------------------------------------------------------
@@ -36,29 +49,65 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 // ---------------------------------------------------------------------------
 
 export async function fetchRecentActivity(limit = 10): Promise<ActivityLog[]> {
-  // TODO: Replace with FastAPI call → GET /api/v1/activity?limit={limit}
-  return MOCK_ACTIVITY.slice(0, limit);
+  return apiFetch<ActivityLog[]>(`/activity?limit=${limit}`);
 }
 
 // ---------------------------------------------------------------------------
-// Users (profiles)
+// Users
 // ---------------------------------------------------------------------------
 
-export async function fetchAllUsers(): Promise<Profile[]> {
-  // TODO: Replace with FastAPI call → GET /api/v1/users
-  return [...MOCK_USERS];
+export interface UserRecord {
+  id:         string;
+  name:       string;
+  email:      string;
+  role:       string;   // "admin" | "developer" | "project_manager"
+  is_active:  boolean;
+  created_at: string | null;
+}
+
+export async function fetchAllUsers(): Promise<UserRecord[]> {
+  return apiFetch<UserRecord[]>("/users");
+}
+
+export async function createUser(data: {
+  name:      string;
+  email:     string;
+  password:  string;
+  role:      string;
+  is_active: boolean;
+}): Promise<UserRecord> {
+  return apiFetch<UserRecord>("/users", {
+    method: "POST",
+    body:   JSON.stringify(data),
+  });
+}
+
+export async function updateUser(
+  userId: string,
+  data: { name?: string; email?: string; role?: string; is_active?: boolean },
+): Promise<UserRecord> {
+  return apiFetch<UserRecord>(`/users/${userId}`, {
+    method: "PUT",
+    body:   JSON.stringify(data),
+  });
 }
 
 export async function updateUserRole(userId: string, role: string): Promise<void> {
-  // TODO: Replace with FastAPI call → PATCH /api/v1/users/{userId}
-  const user = MOCK_USERS.find((u) => u.id === userId);
-  if (user) user.role = role as Profile["role"];
+  await apiFetch(`/users/${userId}`, {
+    method: "PATCH",
+    body:   JSON.stringify({ role }),
+  });
 }
 
 export async function updateUserStatus(userId: string, isActive: boolean): Promise<void> {
-  // TODO: Replace with FastAPI call → PATCH /api/v1/users/{userId}
-  const user = MOCK_USERS.find((u) => u.id === userId);
-  if (user) user.is_active = isActive;
+  await apiFetch(`/users/${userId}/status`, {
+    method: "PATCH",
+    body:   JSON.stringify({ is_active: isActive }),
+  });
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  await apiFetch(`/users/${userId}`, { method: "DELETE" });
 }
 
 // ---------------------------------------------------------------------------
@@ -66,28 +115,27 @@ export async function updateUserStatus(userId: string, isActive: boolean): Promi
 // ---------------------------------------------------------------------------
 
 export async function fetchAllProjects(): Promise<Project[]> {
-  // TODO: Replace with FastAPI call → GET /api/v1/projects
-  return [...MOCK_PROJECTS];
+  return apiFetch<Project[]>("/projects");
 }
 
-export async function createProject(data: Omit<Project, "id" | "created_at" | "updated_at">): Promise<Project> {
-  // TODO: Replace with FastAPI call → POST /api/v1/projects
-  const now = new Date().toISOString();
-  const newProject: Project = { ...data, id: `p${Date.now()}`, created_at: now, updated_at: now };
-  MOCK_PROJECTS.unshift(newProject);
-  return newProject;
+export async function createProject(
+  data: Omit<Project, "id" | "created_at" | "updated_at">,
+): Promise<Project> {
+  return apiFetch<Project>("/projects", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function updateProject(id: string, data: Partial<Project>): Promise<void> {
-  // TODO: Replace with FastAPI call → PATCH /api/v1/projects/{id}
-  const idx = MOCK_PROJECTS.findIndex((p) => p.id === id);
-  if (idx !== -1) MOCK_PROJECTS[idx] = { ...MOCK_PROJECTS[idx], ...data, updated_at: new Date().toISOString() };
+  await apiFetch(`/projects/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  // TODO: Replace with FastAPI call → DELETE /api/v1/projects/{id}
-  const idx = MOCK_PROJECTS.findIndex((p) => p.id === id);
-  if (idx !== -1) MOCK_PROJECTS.splice(idx, 1);
+  await apiFetch(`/projects/${id}`, { method: "DELETE" });
 }
 
 // ---------------------------------------------------------------------------
@@ -95,28 +143,27 @@ export async function deleteProject(id: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function fetchAllTasks(): Promise<Task[]> {
-  // TODO: Replace with FastAPI call → GET /api/v1/tasks
-  return [...MOCK_TASKS];
+  return apiFetch<Task[]>("/tasks");
 }
 
-export async function createTask(data: Omit<Task, "id" | "created_at" | "updated_at">): Promise<Task> {
-  // TODO: Replace with FastAPI call → POST /api/v1/tasks
-  const now = new Date().toISOString();
-  const newTask: Task = { ...data, id: `t${Date.now()}`, created_at: now, updated_at: now };
-  MOCK_TASKS.unshift(newTask);
-  return newTask;
+export async function createTask(
+  data: Omit<Task, "id" | "created_at" | "updated_at">,
+): Promise<Task> {
+  return apiFetch<Task>("/tasks", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function updateTask(id: string, data: Partial<Task>): Promise<void> {
-  // TODO: Replace with FastAPI call → PATCH /api/v1/tasks/{id}
-  const idx = MOCK_TASKS.findIndex((t) => t.id === id);
-  if (idx !== -1) MOCK_TASKS[idx] = { ...MOCK_TASKS[idx], ...data, updated_at: new Date().toISOString() };
+  await apiFetch(`/tasks/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  // TODO: Replace with FastAPI call → DELETE /api/v1/tasks/{id}
-  const idx = MOCK_TASKS.findIndex((t) => t.id === id);
-  if (idx !== -1) MOCK_TASKS.splice(idx, 1);
+  await apiFetch(`/tasks/${id}`, { method: "DELETE" });
 }
 
 // ---------------------------------------------------------------------------
@@ -124,14 +171,17 @@ export async function deleteTask(id: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function fetchAllRisks(): Promise<WorkflowRisk[]> {
-  // TODO: Replace with FastAPI call → GET /api/v1/workflow-risks
-  return [...MOCK_RISKS];
+  return apiFetch<WorkflowRisk[]>("/workflow-risks");
 }
 
-export async function updateRiskStatus(id: string, status: WorkflowRisk["status"]): Promise<void> {
-  // TODO: Replace with FastAPI call → PATCH /api/v1/workflow-risks/{id}
-  const risk = MOCK_RISKS.find((r) => r.id === id);
-  if (risk) { risk.status = status; risk.updated_at = new Date().toISOString(); }
+export async function updateRiskStatus(
+  id: string,
+  status: WorkflowRisk["status"],
+): Promise<void> {
+  await apiFetch(`/workflow-risks/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -139,25 +189,28 @@ export async function updateRiskStatus(id: string, status: WorkflowRisk["status"
 // ---------------------------------------------------------------------------
 
 export async function fetchAllRepositories(): Promise<Repository[]> {
-  // TODO: Replace with FastAPI call → GET /api/v1/repositories
-  return [...MOCK_REPOSITORIES];
+  return apiFetch<Repository[]>("/repositories");
 }
 
-export async function createRepository(data: Omit<Repository, "id">): Promise<Repository> {
-  // TODO: Replace with FastAPI call → POST /api/v1/repositories
-  const newRepo: Repository = { ...data, id: `repo${Date.now()}` };
-  MOCK_REPOSITORIES.unshift(newRepo);
-  return newRepo;
+export async function createRepository(
+  data: Omit<Repository, "id">,
+): Promise<Repository> {
+  return apiFetch<Repository>("/repositories", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
-export async function updateRepository(id: string, data: Partial<Repository>): Promise<void> {
-  // TODO: Replace with FastAPI call → PATCH /api/v1/repositories/{id}
-  const idx = MOCK_REPOSITORIES.findIndex((r) => r.id === id);
-  if (idx !== -1) MOCK_REPOSITORIES[idx] = { ...MOCK_REPOSITORIES[idx], ...data };
+export async function updateRepository(
+  id: string,
+  data: Partial<Repository>,
+): Promise<void> {
+  await apiFetch(`/repositories/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function deleteRepository(id: string): Promise<void> {
-  // TODO: Replace with FastAPI call → DELETE /api/v1/repositories/{id}
-  const idx = MOCK_REPOSITORIES.findIndex((r) => r.id === id);
-  if (idx !== -1) MOCK_REPOSITORIES.splice(idx, 1);
+  await apiFetch(`/repositories/${id}`, { method: "DELETE" });
 }

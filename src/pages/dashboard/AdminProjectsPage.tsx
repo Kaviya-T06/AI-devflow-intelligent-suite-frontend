@@ -7,9 +7,10 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  fetchAllUsers,
+  type UserRecord,
 } from "../../services/adminService";
-import { MOCK_USERS } from "../../services/mockData";
-import type { Project, ProjectStatus, Profile } from "../../types";
+import type { Project, ProjectStatus } from "../../types";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   Active:    "bg-success-500/15 text-success-300 border-success-500/20",
@@ -20,7 +21,7 @@ const STATUS_COLORS: Record<ProjectStatus, string> = {
 
 const STATUSES: ProjectStatus[] = ["Active", "Planning", "Completed", "On Hold"];
 
-const managers: Profile[] = MOCK_USERS.filter((u) => u.role === "MANAGER" || u.role === "ADMIN");
+
 
 const ProgressBar = ({ value }: { value: number }) => (
   <div className="flex items-center gap-2">
@@ -41,9 +42,10 @@ interface ModalProps {
   initial?: Partial<Project>;
   onSave: (data: Partial<Project>) => Promise<void>;
   onClose: () => void;
+  managers: UserRecord[];
 }
 
-function ProjectModal({ initial, onSave, onClose }: ModalProps) {
+function ProjectModal({ initial, onSave, onClose, managers }: ModalProps) {
   const [form, setForm] = useState({
     name:               initial?.name ?? "",
     description:        initial?.description ?? "",
@@ -72,7 +74,7 @@ function ProjectModal({ initial, onSave, onClose }: ModalProps) {
     setSaving(true);
     try {
       const manager = managers.find((m) => m.id === form.project_manager_id) ?? null;
-      await onSave({ ...form, project_manager: manager });
+      await onSave({ ...form, project_manager: manager ? { id: manager.id, full_name: manager.name, email: manager.email, role: manager.role, is_active: manager.is_active, created_at: "", updated_at: "" } : null });
       onClose();
     } finally {
       setSaving(false);
@@ -126,7 +128,7 @@ function ProjectModal({ initial, onSave, onClose }: ModalProps) {
             <select className="input w-full" id="project-manager" value={form.project_manager_id ?? ""}
               onChange={(e) => setForm({ ...form, project_manager_id: e.target.value || null })}>
               <option value="">Unassigned</option>
-              {managers.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+              {managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
 
@@ -184,6 +186,7 @@ function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: (
 // ---------------------------------------------------------------------------
 export default function AdminProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [managers, setManagers] = useState<UserRecord[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [search, setSearch]     = useState("");
@@ -195,8 +198,14 @@ export default function AdminProjectsPage() {
 
   const load = () => {
     setLoading(true);
-    fetchAllProjects()
-      .then(setProjects)
+    Promise.all([
+      fetchAllProjects(),
+      fetchAllUsers(),
+    ])
+      .then(([projs, users]) => {
+        setProjects(projs);
+        setManagers(users.filter((u) => u.role === "admin" || u.role === "project_manager"));
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   };
@@ -257,6 +266,7 @@ export default function AdminProjectsPage() {
       {modal && (
         <ProjectModal
           initial={editing ?? undefined}
+          managers={managers}
           onSave={handleSave}
           onClose={() => { setModal(null); setEditing(null); }}
         />

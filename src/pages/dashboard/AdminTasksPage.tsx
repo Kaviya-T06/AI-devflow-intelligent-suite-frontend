@@ -2,9 +2,8 @@
  * Admin Tasks Page — Create, view, edit, and delete tasks with filtering.
  */
 import { useEffect, useState, useMemo } from "react";
-import { fetchAllTasks, createTask, updateTask, deleteTask } from "../../services/adminService";
-import { MOCK_PROJECTS, MOCK_USERS } from "../../services/mockData";
-import type { Task, TaskPriority, TaskStatus } from "../../types";
+import { fetchAllTasks, createTask, updateTask, deleteTask, fetchAllProjects, fetchAllUsers, type UserRecord } from "../../services/adminService";
+import type { Task, TaskPriority, TaskStatus, Project } from "../../types";
 
 const PRIORITY_COLORS: Record<TaskPriority, string> = {
   Low:      "bg-surface-700/40 text-surface-400 border-surface-600/30",
@@ -30,9 +29,11 @@ interface ModalProps {
   initial?: Partial<Task>;
   onSave: (data: Partial<Task>) => Promise<void>;
   onClose: () => void;
+  projects: Project[];
+  users: UserRecord[];
 }
 
-function TaskModal({ initial, onSave, onClose }: ModalProps) {
+function TaskModal({ initial, onSave, onClose, projects, users }: ModalProps) {
   const [form, setForm] = useState({
     title:       initial?.title       ?? "",
     description: initial?.description ?? "",
@@ -57,12 +58,12 @@ function TaskModal({ initial, onSave, onClose }: ModalProps) {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setSaving(true);
     try {
-      const project  = MOCK_PROJECTS.find((p) => p.id === form.project_id);
-      const assignee = MOCK_USERS.find((u) => u.id === form.assigned_to);
+      const project  = projects.find((p) => p.id === form.project_id);
+      const assignee = users.find((u) => u.id === form.assigned_to);
       await onSave({
         ...form,
         project:  project  ? { id: project.id, name: project.name } : null,
-        assignee: assignee ? { id: assignee.id, full_name: assignee.full_name, email: assignee.email } : null,
+        assignee: assignee ? { id: assignee.id, full_name: assignee.name, email: assignee.email } : null,
       });
       onClose();
     } finally {
@@ -117,7 +118,7 @@ function TaskModal({ initial, onSave, onClose }: ModalProps) {
             <select className="input w-full" id="task-project" value={form.project_id ?? ""}
               onChange={(e) => setForm({ ...form, project_id: e.target.value || null })}>
               <option value="">No project</option>
-              {MOCK_PROJECTS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
 
@@ -126,8 +127,8 @@ function TaskModal({ initial, onSave, onClose }: ModalProps) {
             <select className="input w-full" id="task-assignee" value={form.assigned_to ?? ""}
               onChange={(e) => setForm({ ...form, assigned_to: e.target.value || null })}>
               <option value="">Unassigned</option>
-              {MOCK_USERS.filter((u) => u.is_active).map((u) => (
-                <option key={u.id} value={u.id}>{u.full_name}</option>
+              {users.filter((u) => u.is_active).map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
               ))}
             </select>
           </div>
@@ -178,6 +179,8 @@ function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: (
 // ---------------------------------------------------------------------------
 export default function AdminTasksPage() {
   const [tasks, setTasks]       = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [users, setUsers]       = useState<UserRecord[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [statusFilter, setStatusFilter]   = useState("All");
@@ -190,8 +193,8 @@ export default function AdminTasksPage() {
 
   const load = () => {
     setLoading(true);
-    fetchAllTasks()
-      .then(setTasks)
+    Promise.all([fetchAllTasks(), fetchAllProjects(), fetchAllUsers()])
+      .then(([t, p, u]) => { setTasks(t); setProjects(p); setUsers(u); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   };
@@ -252,6 +255,8 @@ export default function AdminTasksPage() {
       {modal && (
         <TaskModal
           initial={editing ?? undefined}
+          projects={projects}
+          users={users}
           onSave={handleSave}
           onClose={() => { setModal(null); setEditing(null); }}
         />

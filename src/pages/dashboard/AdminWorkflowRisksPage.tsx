@@ -2,9 +2,8 @@
  * Admin Workflow Risks Page — view, filter, and update risk status.
  */
 import { useEffect, useState, useMemo } from "react";
-import { fetchAllRisks, updateRiskStatus } from "../../services/adminService";
-import { MOCK_PROJECTS } from "../../services/mockData";
-import type { WorkflowRisk, RiskSeverity, RiskStatus } from "../../types";
+import { fetchAllRisks, updateRiskStatus, fetchAllProjects } from "../../services/adminService";
+import type { WorkflowRisk, RiskSeverity, RiskStatus, Project } from "../../types";
 
 const SEVERITY_COLORS: Record<RiskSeverity, string> = {
   Low:      "bg-surface-700/40 text-surface-400 border-surface-600/30",
@@ -22,14 +21,15 @@ const STATUS_COLORS: Record<RiskStatus, string> = {
 const SEVERITIES: RiskSeverity[] = ["Low", "Medium", "High", "Critical"];
 const STATUSES:   RiskStatus[]   = ["Open", "Monitoring", "Resolved"];
 
-function getProjectName(projectId: string | null): string {
+function getProjectName(projectId: string | null, projects: Project[]): string {
   if (!projectId) return "—";
-  return MOCK_PROJECTS.find((p) => p.id === projectId)?.name ?? projectId;
+  return projects.find((p) => p.id === projectId)?.name ?? projectId;
 }
 
 export default function AdminWorkflowRisksPage() {
-  const [risks, setRisks]       = useState<WorkflowRisk[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [risks, setRisks]         = useState<WorkflowRisk[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [loading, setLoading]     = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [search, setSearch]     = useState("");
   const [sevFilter, setSevFilter] = useState("All");
@@ -39,8 +39,8 @@ export default function AdminWorkflowRisksPage() {
 
   const load = () => {
     setLoading(true);
-    fetchAllRisks()
-      .then(setRisks)
+    Promise.all([fetchAllRisks(), fetchAllProjects()])
+      .then(([r, p]) => { setRisks(r); setAllProjects(p); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   };
@@ -56,7 +56,7 @@ export default function AdminWorkflowRisksPage() {
       const matchSearch = !search ||
         r.risk_type.toLowerCase().includes(search.toLowerCase()) ||
         r.description.toLowerCase().includes(search.toLowerCase()) ||
-        getProjectName(r.project_id).toLowerCase().includes(search.toLowerCase());
+        getProjectName(r.project_id, allProjects).toLowerCase().includes(search.toLowerCase());
       const matchSev    = sevFilter === "All"    || r.severity === sevFilter;
       const matchStatus = statusFilter === "All" || r.status   === statusFilter;
       return matchSearch && matchSev && matchStatus;
@@ -162,7 +162,7 @@ export default function AdminWorkflowRisksPage() {
                 {filtered.map((risk) => (
                   <tr key={risk.id} className="hover:bg-surface-800/40 transition-colors">
                     <td className="px-6 py-4 text-surface-300 text-sm font-medium whitespace-nowrap">
-                      {getProjectName(risk.project_id)}
+                      {getProjectName(risk.project_id, allProjects)}
                     </td>
                     <td className="px-6 py-4 text-surface-200 text-sm font-medium whitespace-nowrap">
                       {risk.risk_type}

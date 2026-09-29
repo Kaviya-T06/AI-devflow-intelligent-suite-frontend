@@ -7,9 +7,9 @@ import {
   createRepository,
   updateRepository,
   deleteRepository,
+  fetchAllProjects,
 } from "../../services/adminService";
-import { MOCK_PROJECTS } from "../../services/mockData";
-import type { Repository, RepoProvider } from "../../types";
+import type { Repository, RepoProvider, Project } from "../../types";
 
 const PROVIDERS: RepoProvider[] = ["GitHub", "GitLab", "Bitbucket"];
 
@@ -24,9 +24,9 @@ const STATUS_COLORS: Record<string, string> = {
   Disconnected: "bg-danger-500/15 text-danger-300 border-danger-500/20",
 };
 
-function getProjectName(projectId: string | null): string {
+function getProjectName(projectId: string | null, projects: Project[]): string {
   if (!projectId) return "—";
-  return MOCK_PROJECTS.find((p) => p.id === projectId)?.name ?? projectId;
+  return projects.find((p) => p.id === projectId)?.name ?? projectId;
 }
 
 // ---------------------------------------------------------------------------
@@ -36,9 +36,10 @@ interface ModalProps {
   initial?: Partial<Repository>;
   onSave: (data: Partial<Repository>) => Promise<void>;
   onClose: () => void;
+  projects: Project[];
 }
 
-function RepoModal({ initial, onSave, onClose }: ModalProps) {
+function RepoModal({ initial, onSave, onClose, projects }: ModalProps) {
   const [form, setForm] = useState({
     repository_name: initial?.repository_name ?? "",
     repository_url:  initial?.repository_url  ?? "",
@@ -121,7 +122,7 @@ function RepoModal({ initial, onSave, onClose }: ModalProps) {
             <select className="input w-full" id="repo-project" value={form.project_id ?? ""}
               onChange={(e) => setForm({ ...form, project_id: e.target.value || null })}>
               <option value="">No project</option>
-              {MOCK_PROJECTS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
 
@@ -164,8 +165,9 @@ function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: (
 // Main page
 // ---------------------------------------------------------------------------
 export default function AdminRepositoriesPage() {
-  const [repos, setRepos]     = useState<Repository[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [repos, setRepos]       = useState<Repository[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [loading, setLoading]   = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [search, setSearch]   = useState("");
   const [provFilter, setProvFilter] = useState("All");
@@ -176,8 +178,8 @@ export default function AdminRepositoriesPage() {
 
   const load = () => {
     setLoading(true);
-    fetchAllRepositories()
-      .then(setRepos)
+    Promise.all([fetchAllRepositories(), fetchAllProjects()])
+      .then(([r, p]) => { setRepos(r); setAllProjects(p); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   };
@@ -189,7 +191,7 @@ export default function AdminRepositoriesPage() {
     repos.filter((r) => {
       const matchSearch = !search ||
         r.repository_name.toLowerCase().includes(search.toLowerCase()) ||
-        getProjectName(r.project_id).toLowerCase().includes(search.toLowerCase());
+        getProjectName(r.project_id, allProjects).toLowerCase().includes(search.toLowerCase());
       const matchProv = provFilter === "All" || r.provider === provFilter;
       return matchSearch && matchProv;
     }), [repos, search, provFilter]);
@@ -227,6 +229,7 @@ export default function AdminRepositoriesPage() {
       {modal && (
         <RepoModal
           initial={editing ?? undefined}
+          projects={allProjects}
           onSave={handleSave}
           onClose={() => { setModal(null); setEditing(null); }}
         />
@@ -306,7 +309,7 @@ export default function AdminRepositoriesPage() {
                         {repo.repository_url}
                       </a>
                     </td>
-                    <td className="px-6 py-4 text-surface-400 text-sm">{getProjectName(repo.project_id)}</td>
+                    <td className="px-6 py-4 text-surface-400 text-sm">{getProjectName(repo.project_id, allProjects)}</td>
                     <td className="px-6 py-4">
                       <span className={`badge ${PROVIDER_COLORS[repo.provider]}`}>{repo.provider}</span>
                     </td>
