@@ -1,0 +1,190 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Global base styles
+   ============================================================ */
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-surface-950 text-surface-100 font-sans antialiased;
+    background-image: 
+      radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(6, 182, 212, 0.08) 0%, transparent 50%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-surface-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary-600;
+  }
+}
+
+/* ============================================================
+   Component utilities
+   ============================================================ */
+@layer components {
+
+  /* Glass card */
+  .glass-card {
+    @apply bg-surface-800/60 backdrop-blur-md border border-surface-700/50 rounded-xl shadow-glass;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:bg-surface-800/80 hover:border-primary-500/30 hover:shadow-glow;
+  }
+
+  .input-field {
+    @apply w-full bg-surface-800/80 border border-surface-600/60 rounded-lg px-4 py-3
+           text-surface-100 placeholder-surface-500 
+           focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/60
+           transition-all duration-200;
+  }
+
+  /* .input is a shorter alias for .input-field used in admin pages */
+  .input {
+    @apply bg-surface-800/80 border border-surface-600/60 rounded-lg px-3 py-2
+           text-surface-100 placeholder-surface-500 text-sm
+           focus:outline-none focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500/60
+           transition-all duration-200;
+  }
+
+
+  .input-label {
+    @apply block text-sm font-medium text-surface-300 mb-1.5;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 
+           bg-gradient-to-r from-primary-600 to-primary-500
+           hover:from-primary-500 hover:to-accent-500
+           text-white font-semibold rounded-lg shadow-glow
+           transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3
+           bg-surface-700/80 hover:bg-surface-600/80 
+           border border-surface-600/60 hover:border-surface-500/60
+           text-surface-200 font-medium rounded-lg
+           transition-all duration-200;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2
+           text-surface-400 hover:text-surface-100 hover:bg-surface-700/50
+           rounded-lg transition-all duration-200;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3
+           bg-danger-600/20 hover:bg-danger-600/40 
+           border border-danger-500/30 hover:border-danger-500/60
+           text-danger-400 font-medium rounded-lg
+           transition-all duration-200;
+  }
+
+  /* Status badges */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .badge-admin {
+    @apply badge bg-purple-500/20 text-purple-300 border border-purple-500/30;
+  }
+  .badge-manager {
+    @apply badge bg-accent-500/20 text-accent-300 border border-accent-500/30;
+  }
+  .badge-developer {
+    @apply badge bg-primary-500/20 text-primary-300 border border-primary-500/30;
+  }
+
+  /* Sidebar nav item */
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium
+           text-surface-400 hover:text-surface-100 hover:bg-surface-700/50
+           transition-all duration-200 cursor-pointer;
+  }
+
+  .nav-item-active {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium
+           text-primary-300 bg-primary-500/15 border border-primary-500/20;
+  }
+
+  /* Section header */
+  .section-title {
+    @apply text-xl font-bold text-surface-50;
+  }
+
+  .section-subtitle {
+    @apply text-sm text-surface-400;
+  }
+
+  /* Coming soon placeholder */
+  .coming-soon-card {
+    @apply glass-card flex flex-col items-center justify-center gap-4 p-12 text-center min-h-[280px]
+           border-dashed border-surface-600/50;
+  }
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out both;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.35s ease-out both;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-14px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-8px); }
+  }
+
+  .animate-float { animation: float 5s ease-in-out infinite; }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent;
+  }
+}
