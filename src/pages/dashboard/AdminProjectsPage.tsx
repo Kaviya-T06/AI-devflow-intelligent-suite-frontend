@@ -14,13 +14,22 @@ import { normalizeRole } from "../../services/profileService";
 import type { Project, ProjectStatus } from "../../types";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
-  Active:    "bg-success-500/15 text-success-300 border-success-500/20",
-  Planning:  "bg-primary-500/15 text-primary-300 border-primary-500/20",
-  Completed: "bg-surface-700/40 text-surface-400 border-surface-600/30",
-  "On Hold": "bg-warning-500/15 text-warning-300 border-warning-500/20",
+  active:    "bg-success-500/15 text-success-300 border-success-500/20",
+  planning:  "bg-primary-500/15 text-primary-300 border-primary-500/20",
+  completed: "bg-surface-700/40 text-surface-400 border-surface-600/30",
+  on_hold:   "bg-warning-500/15 text-warning-300 border-warning-500/20",
+  archived:  "bg-surface-700/40 text-surface-400 border-surface-600/30",
 };
 
-const STATUSES: ProjectStatus[] = ["Active", "Planning", "Completed", "On Hold"];
+const STATUS_LABELS: Record<ProjectStatus, string> = {
+  planning:  "Planning",
+  active:    "Active",
+  on_hold:   "On Hold",
+  completed: "Completed",
+  archived:  "Archived",
+};
+
+const STATUSES: ProjectStatus[] = ["planning", "active", "on_hold", "completed", "archived"];
 
 
 
@@ -50,7 +59,7 @@ function ProjectModal({ initial, onSave, onClose, managers }: ModalProps) {
   const [form, setForm] = useState({
     name:               initial?.name ?? "",
     description:        initial?.description ?? "",
-    status:             (initial?.status ?? "Planning") as ProjectStatus,
+    status:             (initial?.status ?? "planning") as ProjectStatus,
     project_manager_id: initial?.project_manager_id ?? null as string | null,
     progress:           initial?.progress ?? 0,
     start_date:         initial?.start_date ?? "",
@@ -112,7 +121,7 @@ function ProjectModal({ initial, onSave, onClose, managers }: ModalProps) {
               <label className="input-label">Status</label>
               <select className="input w-full" id="project-status" value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}>
-                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
               </select>
             </div>
             <div>
@@ -205,7 +214,7 @@ export default function AdminProjectsPage() {
     ])
       .then(([projs, users]) => {
         setProjects(projs);
-        setManagers(users.filter((u) => u.role === "admin" || u.role === "project_manager"));
+        setManagers(users.filter((u) => u.role === "project_manager"));
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
@@ -232,7 +241,7 @@ export default function AdminProjectsPage() {
       const created = await createProject({
         name: data.name!,
         description: data.description ?? null,
-        status: data.status ?? "Planning",
+        status: data.status ?? "planning",
         project_manager_id: data.project_manager_id ?? null,
         project_manager: data.project_manager,
         progress: data.progress ?? 0,
@@ -282,7 +291,7 @@ export default function AdminProjectsPage() {
         <div>
           <h2 className="text-2xl font-bold text-surface-50">Projects</h2>
           <p className="text-surface-400 text-sm mt-1">
-            {projects.filter((p) => p.status === "Active").length} active · {projects.length} total
+            {projects.filter((p) => p.status === "active").length} active · {projects.length} total
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -300,7 +309,7 @@ export default function AdminProjectsPage() {
           onChange={(e) => setSearch(e.target.value)} className="input flex-1" id="projects-search" />
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input sm:w-44" id="projects-status-filter">
           <option value="All">All Statuses</option>
-          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
         </select>
       </div>
 
@@ -329,7 +338,7 @@ export default function AdminProjectsPage() {
                   <h3 className="text-surface-100 font-semibold text-base truncate">{project.name}</h3>
                   <p className="text-surface-400 text-sm mt-1 line-clamp-2">{project.description || "No description"}</p>
                 </div>
-                <span className={`badge shrink-0 ${STATUS_COLORS[project.status]}`}>{project.status}</span>
+                <span className={`badge shrink-0 ${STATUS_COLORS[project.status]}`}>{STATUS_LABELS[project.status] ?? project.status}</span>
               </div>
 
               <ProgressBar value={project.progress} />

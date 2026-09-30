@@ -64,7 +64,12 @@ export interface NavItem {
 // Projects
 // ---------------------------------------------------------------------------
 
-export type ProjectStatus = "Active" | "Planning" | "Completed" | "On Hold";
+export type ProjectStatus =
+  | "planning"
+  | "active"
+  | "on_hold"
+  | "completed"
+  | "archived";
 
 export interface Project {
   id: string;
@@ -77,6 +82,8 @@ export interface Project {
   end_date: string | null;
   created_at: string;
   updated_at: string;
+  member_count?: number;
+  task_count?: number;
   // Joined
   project_manager?: Profile | null;
 }
