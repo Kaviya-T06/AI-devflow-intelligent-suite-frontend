@@ -1,76 +1,119 @@
 /**
- * Profile service — fetches and updates user profile from Supabase.
- * Falls back to a synthesized admin profile when the DB table doesn't exist yet
- * (pre-database milestone). This fallback is removed once the DB is live.
+ * Profile service — communicates with the FastAPI backend for user profile operations.
+ *
+ * NOTE ON ARCHITECTURE:
+ * The primary application data and authentication is handled by FastAPI backed by `public.users`.
+ * Direct Supabase Auth / `public.profiles` calls are isolated legacy operations.
  */
-import { supabase } from "../lib/supabaseClient";
-import type { Profile } from "../types";
+import type { Profile, UserRole } from "../types";
+import type { UserRecord } from "./adminService";
+
+const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const BASE = `${API}/api/v1`;
 
 // ---------------------------------------------------------------------------
-// Fallback profile builder (pre-DB milestone)
-// Builds a valid Profile from the Supabase auth user so the app is fully
-// functional before the `profiles` table exists.
+// Role normalizer: maps backend role ("admin", "developer", "project_manager")
+// to frontend UserRole ("ADMIN", "DEVELOPER", "MANAGER")
 // ---------------------------------------------------------------------------
-async function buildFallbackProfile(userId: string): Promise<Profile> {
-  const { data: { user } } = await supabase.auth.getUser();
-  const email = user?.email ?? "unknown@devflow.io";
-  const displayName = email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  const now = new Date().toISOString();
 
+export function normalizeRole(roleStr?: string): UserRole {
+  if (!roleStr) return "DEVELOPER";
+  const upper = roleStr.toUpperCase();
+  if (upper === "ADMIN") return "ADMIN";
+  if (upper === "PROJECT_MANAGER" || upper === "MANAGER") return "MANAGER";
+  return "DEVELOPER";
+}
+
+function userRecordToProfile(user: UserRecord | { id: string; name: string; email: string; role: string; is_active?: boolean; created_at?: string | null }): Profile {
   return {
-    id:         userId,
-    full_name:  displayName,
-    email,
-    // Treat every authenticated user as ADMIN until the DB is ready.
-    // Once the `profiles` table exists this path is never reached.
-    role:       "ADMIN",
+    id: user.id,
+    full_name: user.name,
+    email: user.email,
+    role: normalizeRole(user.role),
     avatar_url: null,
-    is_active:  true,
-    created_at: now,
-    updated_at: now,
+    is_active: user.is_active ?? true,
+    created_at: user.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 }
 
 // ---------------------------------------------------------------------------
-// Fetch profile
+// Fetch profile via FastAPI /users/me
 // ---------------------------------------------------------------------------
 
-export async function fetchProfile(userId: string): Promise<Profile | null> {
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+export async function fetchProfile(_userId?: string): Promise<Profile | null> {
+  const token = localStorage.getItem("access_token");
+  if (!token) return null;
 
-    if (error) {
-      // PGRST116 = row not found; any Supabase table error means DB not ready yet
-      // → fall back to synthesized admin profile
-      return await buildFallbackProfile(userId);
+  try {
+    const res = await fetch(`${BASE}/users/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      // Fallback from localStorage auth_user if endpoint fails
+      const stored = localStorage.getItem("auth_user");
+      if (stored) {
+        return userRecordToProfile(JSON.parse(stored));
+      }
+      return null;
     }
 
-    return data as Profile;
+    const user: UserRecord = await res.json();
+    return userRecordToProfile(user);
   } catch {
-    // Network error or table doesn't exist — use fallback
-    return await buildFallbackProfile(userId);
+    const stored = localStorage.getItem("auth_user");
+    if (stored) {
+      return userRecordToProfile(JSON.parse(stored));
+    }
+    return null;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Update profile
+// Update profile via FastAPI PATCH /users/me
 // ---------------------------------------------------------------------------
 
 export async function updateProfile(
-  userId: string,
+  _userId: string,
   updates: Partial<Pick<Profile, "full_name" | "avatar_url">>
 ): Promise<Profile> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq("id", userId)
-    .select()
-    .single();
+  const token = localStorage.getItem("access_token");
+  if (!token) throw new Error("Not authenticated");
 
-  if (error) throw error;
-  return data as Profile;
+  const res = await fetch(`${BASE}/users/me`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: updates.full_name,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "Failed to update profile");
+  }
+
+  const updatedUser: UserRecord = await res.json();
+  const profile = userRecordToProfile(updatedUser);
+
+  // Sync local storage auth_user cache
+  const storedUser = localStorage.getItem("auth_user");
+  if (storedUser) {
+    try {
+      const parsed = JSON.parse(storedUser);
+      parsed.name = updatedUser.name;
+      localStorage.setItem("auth_user", JSON.stringify(parsed));
+    } catch {
+      // ignore JSON parse error
+    }
+  }
+
+  return profile;
 }

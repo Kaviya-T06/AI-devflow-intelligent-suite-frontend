@@ -1,7 +1,7 @@
 /**
  * Profile page — view and update your own profile.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { updateProfile } from "../../services/profileService";
 import type { UserRole } from "../../types";
@@ -22,6 +22,11 @@ const ROLE_LABELS: Record<UserRole, { label: string; cls: string; description: s
     cls: "badge-developer",
     description: "Personal workflow, assigned tasks, contribution tracking.",
   },
+  TEAM_MEMBER: {
+    label: "Team Member",
+    cls: "badge-developer",
+    description: "Personal workflow, assigned tasks, contribution tracking.",
+  },
 };
 
 export default function ProfilePage() {
@@ -31,6 +36,12 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (profile?.full_name && !isEditing) {
+      setFullName(profile.full_name);
+    }
+  }, [profile?.full_name, isEditing]);
 
   const role = (profile?.role || "DEVELOPER") as UserRole;
   const roleInfo = ROLE_LABELS[role];
@@ -117,7 +128,6 @@ export default function ProfilePage() {
             <label className="input-label">Email Address</label>
             <p className="text-surface-400 py-3 px-4 bg-surface-800/20 rounded-lg border border-surface-700/20 text-sm">
               {profile?.email || user?.email || "—"}
-              <span className="ml-2 text-xs text-surface-600">(managed by Supabase Auth)</span>
             </p>
           </div>
 

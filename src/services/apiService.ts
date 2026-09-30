@@ -42,5 +42,5 @@ export async function checkBackendHealth() {
 // ---------------------------------------------------------------------------
 
 export async function getMyProfile(token: string) {
-  return request<Record<string, unknown>>("/api/v1/profiles/me", {}, token);
+  return request<Record<string, unknown>>("/api/v1/users/me", {}, token);
 }

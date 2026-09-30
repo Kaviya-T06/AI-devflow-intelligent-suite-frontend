@@ -10,6 +10,7 @@ import {
   fetchAllUsers,
   type UserRecord,
 } from "../../services/adminService";
+import { normalizeRole } from "../../services/profileService";
 import type { Project, ProjectStatus } from "../../types";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
@@ -74,7 +75,7 @@ function ProjectModal({ initial, onSave, onClose, managers }: ModalProps) {
     setSaving(true);
     try {
       const manager = managers.find((m) => m.id === form.project_manager_id) ?? null;
-      await onSave({ ...form, project_manager: manager ? { id: manager.id, full_name: manager.name, email: manager.email, role: manager.role, is_active: manager.is_active, created_at: "", updated_at: "" } : null });
+      await onSave({ ...form, project_manager: manager ? { id: manager.id, full_name: manager.name, email: manager.email, role: normalizeRole(manager.role), is_active: manager.is_active, created_at: "", updated_at: "" } : null });
       onClose();
     } finally {
       setSaving(false);
@@ -228,7 +229,6 @@ export default function AdminProjectsPage() {
       setProjects((prev) => prev.map((p) => p.id === editing.id ? { ...p, ...data } : p));
       showToast("Project updated successfully");
     } else {
-      const now = new Date().toISOString();
       const created = await createProject({
         name: data.name!,
         description: data.description ?? null,
@@ -238,8 +238,6 @@ export default function AdminProjectsPage() {
         progress: data.progress ?? 0,
         start_date: data.start_date ?? null,
         end_date: data.end_date ?? null,
-        created_at: now,
-        updated_at: now,
       });
       setProjects((prev) => [created, ...prev]);
       showToast("Project created successfully");

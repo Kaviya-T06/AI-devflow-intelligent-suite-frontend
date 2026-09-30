@@ -216,7 +216,6 @@ export default function AdminTasksPage() {
       setTasks((prev) => prev.map((t) => t.id === editing.id ? { ...t, ...data } : t));
       showToast("Task updated successfully");
     } else {
-      const now = new Date().toISOString();
       const created = await createTask({
         title:       data.title!,
         description: data.description ?? null,
@@ -227,8 +226,6 @@ export default function AdminTasksPage() {
         due_date:    data.due_date  || null,
         project:     data.project  ?? null,
         assignee:    data.assignee ?? null,
-        created_at:  now,
-        updated_at:  now,
       });
       setTasks((prev) => [created, ...prev]);
       showToast("Task created successfully");

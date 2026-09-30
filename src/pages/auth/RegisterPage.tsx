@@ -339,10 +339,10 @@ function SignupFormStep({
           </div>
           <h2 className="text-2xl font-bold text-surface-50 mb-2">Account Created!</h2>
           <p className="text-surface-400 mb-2">
-            We sent a verification email to <span className="text-primary-300 font-medium">{form.email}</span>.
+            Your account for <span className="text-primary-300 font-medium">{form.email}</span> has been created successfully.
           </p>
           <p className="text-surface-500 text-sm mb-8">
-            Please check your inbox and click the confirmation link before signing in.
+            You can now sign in to access your developer workspace.
           </p>
           <button onClick={() => navigate("/login")} className="btn-primary w-full">
             Go to Sign In
