@@ -24,6 +24,10 @@ import AdminActivityLogsPage from "./pages/dashboard/AdminActivityLogsPage";
 import AdminWorkflowRisksPage from "./pages/dashboard/AdminWorkflowRisksPage";
 import AdminRepositoriesPage from "./pages/dashboard/AdminRepositoriesPage";
 import AdminSettingsPage from "./pages/dashboard/AdminSettingsPage";
+// Project Manager pages
+import PMProjectsPage from "./pages/dashboard/PMProjectsPage";
+import PMTeamTasksPage from "./pages/dashboard/PMTeamTasksPage";
+import PMActivityPage from "./pages/dashboard/PMActivityPage";
 
 export default function App() {
   return (
@@ -39,15 +43,24 @@ export default function App() {
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/dashboard/profile" element={<ProfilePage />} />
-              
-              {/* Developer / Shared modules */}
-              <Route path="/dashboard/my-tasks"       element={<MyTasksPage />} />
-              <Route path="/dashboard/my-projects"    element={<MyProjectsPage />} />
-              <Route path="/dashboard/my-activity"    element={<MyActivityPage />} />
-              <Route path="/dashboard/notifications"  element={<NotificationsPage />} />
 
-              {/* Admin modules */}
-              <Route element={<RoleRoute allowedRoles={["ADMIN", "MANAGER"]} />}>
+              {/* Developer-only modules */}
+              <Route element={<RoleRoute allowedRoles={["DEVELOPER", "TEAM_MEMBER"]} />}>
+                <Route path="/dashboard/my-tasks"       element={<MyTasksPage />} />
+                <Route path="/dashboard/my-projects"    element={<MyProjectsPage />} />
+                <Route path="/dashboard/my-activity"    element={<MyActivityPage />} />
+                <Route path="/dashboard/notifications"  element={<NotificationsPage />} />
+              </Route>
+
+              {/* Project Manager modules */}
+              <Route element={<RoleRoute allowedRoles={["MANAGER"]} />}>
+                <Route path="/dashboard/pm-projects"    element={<PMProjectsPage />} />
+                <Route path="/dashboard/pm-team-tasks"  element={<PMTeamTasksPage />} />
+                <Route path="/dashboard/pm-activity"    element={<PMActivityPage />} />
+              </Route>
+
+              {/* Admin-only modules */}
+              <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
                 <Route path="/dashboard/users"          element={<AdminUsersPage />} />
                 <Route path="/dashboard/projects"       element={<AdminProjectsPage />} />
                 <Route path="/dashboard/tasks"          element={<AdminTasksPage />} />

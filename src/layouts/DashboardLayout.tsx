@@ -26,25 +26,32 @@ const AnalyticsIcon = () => (<svg className="w-5 h-5" fill="none" viewBox="0 0 2
 const AIIcon = () => (<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>);
 const SettingsIcon = () => (<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
 
+const TeamTasksIcon = () => (<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>);
+
 const ALL_NAV_ITEMS: NavItem[] = [
-  { id: "dashboard",       label: "Dashboard",       path: "/dashboard",                  available: true,  icon: <DashboardIcon />      },
-  // Developer-only / shared items
-  { id: "my-tasks",        label: "My Tasks",        path: "/dashboard/my-tasks",         available: true,  roles: ["DEVELOPER"], icon: <TasksIcon />           },
-  { id: "my-projects",     label: "My Projects",     path: "/dashboard/my-projects",      available: true,  roles: ["DEVELOPER"], icon: <ProjectsIcon />        },
-  { id: "my-activity",     label: "My Activity",     path: "/dashboard/my-activity",      available: true,  roles: ["DEVELOPER"], icon: <ActivityIcon />        },
-  { id: "notifications",   label: "Notifications",   path: "/dashboard/notifications",    available: true,  roles: ["DEVELOPER"], icon: <WorkflowRisksIcon />   },
+  { id: "dashboard",       label: "Dashboard",       path: "/dashboard",                    available: true,  icon: <DashboardIcon />      },
+  // Developer-only nav items
+  { id: "my-tasks",        label: "My Tasks",        path: "/dashboard/my-tasks",           available: true,  roles: ["DEVELOPER"], icon: <TasksIcon />           },
+  { id: "my-projects",     label: "My Projects",     path: "/dashboard/my-projects",        available: true,  roles: ["DEVELOPER"], icon: <ProjectsIcon />        },
+  { id: "my-activity",     label: "My Activity",     path: "/dashboard/my-activity",        available: true,  roles: ["DEVELOPER"], icon: <ActivityIcon />        },
+  { id: "notifications",   label: "Notifications",   path: "/dashboard/notifications",      available: true,  roles: ["DEVELOPER"], icon: <WorkflowRisksIcon />   },
+  // Manager-only nav items
+  { id: "pm-projects",     label: "My Projects",     path: "/dashboard/pm-projects",        available: true,  roles: ["MANAGER"], icon: <ProjectsIcon />        },
+  { id: "pm-team-tasks",   label: "Team Tasks",      path: "/dashboard/pm-team-tasks",      available: true,  roles: ["MANAGER"], icon: <TeamTasksIcon />       },
+  { id: "pm-activity",     label: "Project Activity", path: "/dashboard/pm-activity",       available: true,  roles: ["MANAGER"], icon: <ActivityIcon />        },
   // Admin-only nav items
-  { id: "users",           label: "Users",            path: "/dashboard/users",            available: true,  roles: ["ADMIN"], icon: <UsersIcon />           },
-  { id: "projects",        label: "Projects",         path: "/dashboard/projects",         available: true,  roles: ["ADMIN"], icon: <ProjectsIcon />        },
-  { id: "tasks",           label: "Tasks",            path: "/dashboard/tasks",            available: true,  roles: ["ADMIN"], icon: <TasksIcon />           },
-  { id: "activity",        label: "Activity Logs",    path: "/dashboard/activity",         available: true,  roles: ["ADMIN"], icon: <ActivityIcon />        },
-  { id: "workflow-risks",  label: "Workflow Risks",   path: "/dashboard/workflow-risks",   available: true,  roles: ["ADMIN"], icon: <WorkflowRisksIcon />   },
-  { id: "repositories",   label: "Repositories",     path: "/dashboard/repositories",    available: true,  roles: ["ADMIN"], icon: <RepositoriesIcon />    },
-  { id: "settings",        label: "Settings",         path: "/dashboard/settings",         available: true,  roles: ["ADMIN"], icon: <SettingsIcon />        },
+  { id: "users",           label: "Users",            path: "/dashboard/users",              available: true,  roles: ["ADMIN"], icon: <UsersIcon />           },
+  { id: "projects",        label: "Projects",         path: "/dashboard/projects",           available: true,  roles: ["ADMIN"], icon: <ProjectsIcon />        },
+  { id: "tasks",           label: "Tasks",            path: "/dashboard/tasks",              available: true,  roles: ["ADMIN"], icon: <TasksIcon />           },
+  { id: "activity",        label: "Activity Logs",    path: "/dashboard/activity",           available: true,  roles: ["ADMIN"], icon: <ActivityIcon />        },
+  { id: "workflow-risks",  label: "Workflow Risks",   path: "/dashboard/workflow-risks",     available: true,  roles: ["ADMIN"], icon: <WorkflowRisksIcon />   },
+  { id: "repositories",   label: "Repositories",     path: "/dashboard/repositories",       available: true,  roles: ["ADMIN"], icon: <RepositoriesIcon />    },
+  { id: "settings",        label: "Settings",         path: "/dashboard/settings",           available: true,  roles: ["ADMIN"], icon: <SettingsIcon />        },
   // Future items
-  { id: "analytics",      label: "Analytics",        path: "/dashboard/analytics",        available: false, roles: ["ADMIN"], icon: <AnalyticsIcon />       },
-  { id: "ai-insights",    label: "AI Insights",       path: "/dashboard/ai-insights",      available: false, roles: ["ADMIN"], icon: <AIIcon />              },
+  { id: "analytics",      label: "Analytics",        path: "/dashboard/analytics",          available: false, roles: ["ADMIN"], icon: <AnalyticsIcon />       },
+  { id: "ai-insights",    label: "AI Insights",       path: "/dashboard/ai-insights",        available: false, roles: ["ADMIN"], icon: <AIIcon />              },
 ];
+
 
 const RoleBadge = ({ role }: { role: UserRole }) => {
   const cls = role === "ADMIN" ? "badge-admin" : role === "MANAGER" ? "badge-manager" : "badge-developer";
@@ -55,6 +62,7 @@ function Sidebar({ isOpen, onClose, role }: { isOpen: boolean; onClose: () => vo
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
   const isAdmin = role === "ADMIN";
+  const isManager = role === "MANAGER";
 
   const handleLogout = async () => {
     await signOut();
@@ -94,7 +102,8 @@ function Sidebar({ isOpen, onClose, role }: { isOpen: boolean; onClose: () => vo
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
           {isAdmin && <p className="text-surface-600 text-xs font-semibold uppercase tracking-wider px-2 mb-2">Admin</p>}
-          {!isAdmin && <p className="text-surface-600 text-xs font-semibold uppercase tracking-wider px-2 mb-2">Navigation</p>}
+          {isManager && <p className="text-surface-600 text-xs font-semibold uppercase tracking-wider px-2 mb-2">Project Manager</p>}
+          {!isAdmin && !isManager && <p className="text-surface-600 text-xs font-semibold uppercase tracking-wider px-2 mb-2">Navigation</p>}
           {navItems.map((item) => {
             if (item.available) {
               return (
@@ -155,7 +164,7 @@ function TopHeader({ onMenuClick }: { onMenuClick: () => void }) {
         <h1 className="text-surface-100 font-semibold text-sm lg:text-base">AI DevFlow <span className="text-surface-500 font-normal">Intelligence Suite</span></h1>
       </div>
       <div className="flex items-center gap-3">
-        <span className="hidden sm:flex badge bg-primary-500/15 text-primary-300 border border-primary-500/20">Milestone 2</span>
+        <span className="hidden sm:flex badge bg-primary-500/15 text-primary-300 border border-primary-500/20">Milestone 3</span>
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-xs">
           {profile?.full_name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?"}
         </div>

@@ -170,3 +170,76 @@ export interface Repository {
   status: string;
   connected_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Project Manager Dashboard
+// ---------------------------------------------------------------------------
+
+export interface DeveloperWorkload {
+  developer_id: string;
+  developer_name: string;
+  total_tasks: number;
+  completed_tasks: number;
+  in_progress_tasks: number;
+  review_tasks: number;
+  todo_tasks: number;
+  overdue_tasks: number;
+}
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  progress: number;
+  start_date: string | null;
+  end_date: string | null;
+  total_tasks: number;
+  completed_tasks: number;
+  in_progress_tasks: number;
+  review_tasks: number;
+  todo_tasks: number;
+  overdue_tasks: number;
+  developers: DeveloperWorkload[];
+}
+
+export interface OverdueTaskSummary {
+  task_id: string;
+  task_title: string;
+  project_id: string | null;
+  project_name: string | null;
+  assigned_to: string | null;
+  developer_name: string | null;
+  due_date: string;
+  status: string;
+  priority: string;
+}
+
+export interface PMDashboardStats {
+  total_projects: number;
+  active_projects: number;
+  planning_projects: number;
+  on_hold_projects: number;
+  completed_projects: number;
+  total_tasks: number;
+  completed_tasks: number;
+  in_progress_tasks: number;
+  review_tasks: number;
+  todo_tasks: number;
+  overdue_tasks: number;
+  average_progress: number;
+  projects: ProjectSummary[];
+  overdue_task_list: OverdueTaskSummary[];
+}
+
+export interface PMActivityItem {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  description: string;
+  created_at: string;
+  user_name: string | null;
+  user_id: string | null;
+}
+

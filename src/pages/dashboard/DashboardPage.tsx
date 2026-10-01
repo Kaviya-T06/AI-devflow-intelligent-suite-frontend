@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import ComingSoonModule from "../../components/dashboard/ComingSoonModule";
 import DeveloperDashboard from "../../components/dashboard/DeveloperDashboard";
+import ProjectManagerDashboard from "../../components/dashboard/ProjectManagerDashboard";
 import { checkBackendHealth } from "../../services/apiService";
 import { fetchDashboardStats, fetchRecentActivity } from "../../services/adminService";
 import type { UserRole } from "../../types";
@@ -114,7 +115,7 @@ export default function DashboardPage() {
   const roleConfig = ROLE_CONFIG[role] ?? ROLE_CONFIG.DEVELOPER;
   const isAdmin = role === "ADMIN";
   const isManager = role === "MANAGER";
-  const showStats = isAdmin || isManager;
+  const showStats = isAdmin; // Only Admin sees the full platform stats here; Manager has its own dashboard component
 
   const [backendStatus, setBackendStatus] = useState<boolean | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -189,8 +190,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Project Manager Dashboard */}
+      {isManager && <ProjectManagerDashboard />}
+
       {/* Developer Dashboard */}
-      {!showStats && <DeveloperDashboard />}
+      {!showStats && !isManager && <DeveloperDashboard />}
 
       {/* Dashboard Stats (Admin / Manager) */}
       {showStats && (
@@ -299,8 +303,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Upcoming modules (show for admins/managers) */}
-      {showStats && (
+      {/* Upcoming modules (show for admin only — manager has dedicated PM pages) */}
+      {showStats && isAdmin && (
         <div>
         <div className="flex items-center gap-3 mb-6">
           <h3 className="section-title">Platform Modules</h3>
