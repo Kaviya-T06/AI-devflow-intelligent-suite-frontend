@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import ComingSoonModule from "../../components/dashboard/ComingSoonModule";
+import DeveloperDashboard from "../../components/dashboard/DeveloperDashboard";
 import { checkBackendHealth } from "../../services/apiService";
 import { fetchDashboardStats, fetchRecentActivity } from "../../services/adminService";
 import type { UserRole } from "../../types";
@@ -188,6 +189,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Developer Dashboard */}
+      {!showStats && <DeveloperDashboard />}
+
       {/* Dashboard Stats (Admin / Manager) */}
       {showStats && (
         <div className="space-y-8">
@@ -274,8 +278,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Account info (non-admin) */}
-      {!isAdmin && (
+      {/* Account info (only show for managers, if any, or general if we want. But since DEVELOPER dashboard handles itself, we skip here) */}
+      {!isAdmin && !showStats && false && (
         <div>
           <h3 className="section-title mb-4">Your Account</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -295,8 +299,9 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Upcoming modules */}
-      <div>
+      {/* Upcoming modules (show for admins/managers) */}
+      {showStats && (
+        <div>
         <div className="flex items-center gap-3 mb-6">
           <h3 className="section-title">Platform Modules</h3>
           <span className="badge bg-surface-700/50 text-surface-400 border border-surface-600/40">Modules unlock progressively</span>
@@ -306,7 +311,8 @@ export default function DashboardPage() {
             <ComingSoonModule key={mod.title} {...mod} />
           ))}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

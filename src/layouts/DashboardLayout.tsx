@@ -11,7 +11,7 @@ interface NavItem {
   label: string;
   path: string;
   available: boolean;
-  adminOnly?: boolean;
+  roles?: UserRole[];
   icon: ReactNode;
 }
 
@@ -28,17 +28,22 @@ const SettingsIcon = () => (<svg className="w-5 h-5" fill="none" viewBox="0 0 24
 
 const ALL_NAV_ITEMS: NavItem[] = [
   { id: "dashboard",       label: "Dashboard",       path: "/dashboard",                  available: true,  icon: <DashboardIcon />      },
+  // Developer-only / shared items
+  { id: "my-tasks",        label: "My Tasks",        path: "/dashboard/my-tasks",         available: true,  roles: ["DEVELOPER"], icon: <TasksIcon />           },
+  { id: "my-projects",     label: "My Projects",     path: "/dashboard/my-projects",      available: true,  roles: ["DEVELOPER"], icon: <ProjectsIcon />        },
+  { id: "my-activity",     label: "My Activity",     path: "/dashboard/my-activity",      available: true,  roles: ["DEVELOPER"], icon: <ActivityIcon />        },
+  { id: "notifications",   label: "Notifications",   path: "/dashboard/notifications",    available: true,  roles: ["DEVELOPER"], icon: <WorkflowRisksIcon />   },
   // Admin-only nav items
-  { id: "users",           label: "Users",            path: "/dashboard/users",            available: true,  adminOnly: true, icon: <UsersIcon />           },
-  { id: "projects",        label: "Projects",         path: "/dashboard/projects",         available: true,  adminOnly: true, icon: <ProjectsIcon />        },
-  { id: "tasks",           label: "Tasks",            path: "/dashboard/tasks",            available: true,  adminOnly: true, icon: <TasksIcon />           },
-  { id: "activity",        label: "Activity Logs",    path: "/dashboard/activity",         available: true,  adminOnly: true, icon: <ActivityIcon />        },
-  { id: "workflow-risks",  label: "Workflow Risks",   path: "/dashboard/workflow-risks",   available: true,  adminOnly: true, icon: <WorkflowRisksIcon />   },
-  { id: "repositories",   label: "Repositories",     path: "/dashboard/repositories",    available: true,  adminOnly: true, icon: <RepositoriesIcon />    },
-  { id: "settings",        label: "Settings",         path: "/dashboard/settings",         available: true,  adminOnly: true, icon: <SettingsIcon />        },
+  { id: "users",           label: "Users",            path: "/dashboard/users",            available: true,  roles: ["ADMIN"], icon: <UsersIcon />           },
+  { id: "projects",        label: "Projects",         path: "/dashboard/projects",         available: true,  roles: ["ADMIN"], icon: <ProjectsIcon />        },
+  { id: "tasks",           label: "Tasks",            path: "/dashboard/tasks",            available: true,  roles: ["ADMIN"], icon: <TasksIcon />           },
+  { id: "activity",        label: "Activity Logs",    path: "/dashboard/activity",         available: true,  roles: ["ADMIN"], icon: <ActivityIcon />        },
+  { id: "workflow-risks",  label: "Workflow Risks",   path: "/dashboard/workflow-risks",   available: true,  roles: ["ADMIN"], icon: <WorkflowRisksIcon />   },
+  { id: "repositories",   label: "Repositories",     path: "/dashboard/repositories",    available: true,  roles: ["ADMIN"], icon: <RepositoriesIcon />    },
+  { id: "settings",        label: "Settings",         path: "/dashboard/settings",         available: true,  roles: ["ADMIN"], icon: <SettingsIcon />        },
   // Future items
-  { id: "analytics",      label: "Analytics",        path: "/dashboard/analytics",        available: false, icon: <AnalyticsIcon />       },
-  { id: "ai-insights",    label: "AI Insights",       path: "/dashboard/ai-insights",      available: false, icon: <AIIcon />              },
+  { id: "analytics",      label: "Analytics",        path: "/dashboard/analytics",        available: false, roles: ["ADMIN"], icon: <AnalyticsIcon />       },
+  { id: "ai-insights",    label: "AI Insights",       path: "/dashboard/ai-insights",      available: false, roles: ["ADMIN"], icon: <AIIcon />              },
 ];
 
 const RoleBadge = ({ role }: { role: UserRole }) => {
@@ -66,8 +71,8 @@ function Sidebar({ isOpen, onClose, role }: { isOpen: boolean; onClose: () => vo
 
   // Filter nav items based on role
   const navItems = ALL_NAV_ITEMS.filter((item) => {
-    if (item.adminOnly && !isAdmin) return false;
-    return true;
+    if (!item.roles) return true; // available to all
+    return item.roles.includes(role);
   });
 
   return (

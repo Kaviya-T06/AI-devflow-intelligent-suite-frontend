@@ -161,7 +161,7 @@ export async function fetchAllTasks(): Promise<Task[]> {
 }
 
 export async function createTask(
-  data: Omit<Task, "id" | "created_at" | "updated_at">,
+  data: Omit<Task, "id" | "created_at" | "updated_at" | "assigned_at" | "started_at" | "review_started_at" | "completed_at">,
 ): Promise<Task> {
   return apiFetch<Task>("/tasks", {
     method: "POST",

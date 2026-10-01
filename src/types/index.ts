@@ -84,6 +84,7 @@ export interface Project {
   updated_at: string;
   member_count?: number;
   task_count?: number;
+  completed_task_count?: number;
   // Joined
   project_manager?: Profile | null;
 }
@@ -92,8 +93,8 @@ export interface Project {
 // Tasks
 // ---------------------------------------------------------------------------
 
-export type TaskStatus = "To Do" | "In Progress" | "Completed" | "Blocked";
-export type TaskPriority = "Low" | "Medium" | "High" | "Critical";
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
+export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 export interface Task {
   id: string;
@@ -105,7 +106,15 @@ export interface Task {
   priority: TaskPriority;
   due_date: string | null;
   created_at: string;
+  assigned_at: string | null;
+  started_at: string | null;
+  review_started_at: string | null;
+  completed_at: string | null;
   updated_at: string;
+  // Joined fields from backend flat response
+  project_name?: string | null;
+  developer_name?: string | null;
+  
   // Joined
   project?: Pick<Project, "id" | "name"> | null;
   assignee?: Pick<Profile, "id" | "full_name" | "email"> | null;

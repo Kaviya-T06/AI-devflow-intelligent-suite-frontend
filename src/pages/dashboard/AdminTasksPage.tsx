@@ -6,21 +6,21 @@ import { fetchAllTasks, createTask, updateTask, deleteTask, fetchAllProjects, fe
 import type { Task, TaskPriority, TaskStatus, Project } from "../../types";
 
 const PRIORITY_COLORS: Record<TaskPriority, string> = {
-  Low:      "bg-surface-700/40 text-surface-400 border-surface-600/30",
-  Medium:   "bg-primary-500/15 text-primary-300 border-primary-500/20",
-  High:     "bg-warning-500/15 text-warning-300 border-warning-500/20",
-  Critical: "bg-danger-500/15 text-danger-300 border-danger-500/20",
+  LOW:      "bg-surface-700/40 text-surface-400 border-surface-600/30",
+  MEDIUM:   "bg-primary-500/15 text-primary-300 border-primary-500/20",
+  HIGH:     "bg-warning-500/15 text-warning-300 border-warning-500/20",
+  CRITICAL: "bg-danger-500/15 text-danger-300 border-danger-500/20",
 };
 
 const STATUS_COLORS: Record<TaskStatus, string> = {
-  "To Do":       "bg-surface-700/40 text-surface-400 border-surface-600/30",
-  "In Progress": "bg-primary-500/15 text-primary-300 border-primary-500/20",
-  Completed:     "bg-success-500/15 text-success-300 border-success-500/20",
-  Blocked:       "bg-danger-500/15 text-danger-300 border-danger-500/20",
+  TODO:          "bg-surface-700/40 text-surface-400 border-surface-600/30",
+  IN_PROGRESS:   "bg-primary-500/15 text-primary-300 border-primary-500/20",
+  REVIEW:        "bg-warning-500/15 text-warning-300 border-warning-500/20",
+  COMPLETED:     "bg-success-500/15 text-success-300 border-success-500/20",
 };
 
-const STATUSES:   TaskStatus[]   = ["To Do", "In Progress", "Completed", "Blocked"];
-const PRIORITIES: TaskPriority[] = ["Low", "Medium", "High", "Critical"];
+const STATUSES:   TaskStatus[]   = ["TODO", "IN_PROGRESS", "REVIEW", "COMPLETED"];
+const PRIORITIES: TaskPriority[] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
 // ---------------------------------------------------------------------------
 // Modal Form
@@ -37,8 +37,8 @@ function TaskModal({ initial, onSave, onClose, projects, users }: ModalProps) {
   const [form, setForm] = useState({
     title:       initial?.title       ?? "",
     description: initial?.description ?? "",
-    status:      (initial?.status     ?? "To Do") as TaskStatus,
-    priority:    (initial?.priority   ?? "Medium") as TaskPriority,
+    status:      (initial?.status     ?? "TODO") as TaskStatus,
+    priority:    (initial?.priority   ?? "MEDIUM") as TaskPriority,
     project_id:  initial?.project_id  ?? null as string | null,
     assigned_to: initial?.assigned_to ?? null as string | null,
     due_date:    initial?.due_date    ?? "",
@@ -62,6 +62,8 @@ function TaskModal({ initial, onSave, onClose, projects, users }: ModalProps) {
       const assignee = users.find((u) => u.id === form.assigned_to);
       await onSave({
         ...form,
+        project_name: project?.name,
+        developer_name: assignee?.name,
         project:  project  ? { id: project.id, name: project.name } : null,
         assignee: assignee ? { id: assignee.id, full_name: assignee.name, email: assignee.email } : null,
       });
@@ -114,10 +116,10 @@ function TaskModal({ initial, onSave, onClose, projects, users }: ModalProps) {
           </div>
 
           <div>
-            <label className="input-label">Project</label>
-            <select className="input w-full" id="task-project" value={form.project_id ?? ""}
+            <label className="input-label">Project *</label>
+            <select className="input w-full" id="task-project" value={form.project_id ?? ""} required
               onChange={(e) => setForm({ ...form, project_id: e.target.value || null })}>
-              <option value="">No project</option>
+              <option value="" disabled>Select a project</option>
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
@@ -185,6 +187,7 @@ export default function AdminTasksPage() {
   const [error, setError]       = useState<string | null>(null);
   const [statusFilter, setStatusFilter]   = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
+  const [projectFilter, setProjectFilter]   = useState("All");
   const [search, setSearch]     = useState("");
   const [modal, setModal]       = useState<"add" | "edit" | null>(null);
   const [editing, setEditing]   = useState<Task | null>(null);
@@ -193,6 +196,14 @@ export default function AdminTasksPage() {
 
   const load = () => {
     setLoading(true);
+    
+    // Read project_id from URL if present
+    const params = new URLSearchParams(window.location.search);
+    const initialProjectId = params.get("project_id");
+    if (initialProjectId) {
+      setProjectFilter(initialProjectId);
+    }
+
     Promise.all([fetchAllTasks(), fetchAllProjects(), fetchAllUsers()])
       .then(([t, p, u]) => { setTasks(t); setProjects(p); setUsers(u); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"))
@@ -207,8 +218,9 @@ export default function AdminTasksPage() {
       const matchSearch   = !search || t.title.toLowerCase().includes(search.toLowerCase());
       const matchStatus   = statusFilter   === "All" || t.status   === statusFilter;
       const matchPriority = priorityFilter === "All" || t.priority === priorityFilter;
-      return matchSearch && matchStatus && matchPriority;
-    }), [tasks, search, statusFilter, priorityFilter]);
+      const matchProject  = projectFilter  === "All" || t.project_id === projectFilter;
+      return matchSearch && matchStatus && matchPriority && matchProject;
+    }), [tasks, search, statusFilter, priorityFilter, projectFilter]);
 
   const handleSave = async (data: Partial<Task>) => {
     if (editing) {
@@ -219,8 +231,8 @@ export default function AdminTasksPage() {
       const created = await createTask({
         title:       data.title!,
         description: data.description ?? null,
-        status:      data.status  ?? "To Do",
-        priority:    data.priority ?? "Medium",
+        status:      data.status  ?? "TODO",
+        priority:    data.priority ?? "MEDIUM",
         project_id:  data.project_id  ?? null,
         assigned_to: data.assigned_to ?? null,
         due_date:    data.due_date  || null,
@@ -271,7 +283,7 @@ export default function AdminTasksPage() {
         <div>
           <h2 className="text-2xl font-bold text-surface-50">Tasks</h2>
           <p className="text-surface-400 text-sm mt-1">
-            {tasks.filter((t) => t.status !== "Completed").length} open · {tasks.length} total across all projects
+            {tasks.filter((t) => t.status !== "COMPLETED").length} open · {tasks.length} total across all projects
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -284,9 +296,13 @@ export default function AdminTasksPage() {
       </div>
 
       {/* Filters */}
-      <div className="glass-card p-4 flex flex-col sm:flex-row gap-3">
+      <div className="glass-card p-4 flex flex-wrap gap-3">
         <input type="text" placeholder="Search tasks…" value={search}
-          onChange={(e) => setSearch(e.target.value)} className="input flex-1" id="tasks-search" />
+          onChange={(e) => setSearch(e.target.value)} className="input flex-1 min-w-[200px]" id="tasks-search" />
+        <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="input sm:w-48" id="tasks-project-filter">
+          <option value="All">All Projects</option>
+          {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input sm:w-44" id="tasks-status-filter">
           <option value="All">All Statuses</option>
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -333,10 +349,10 @@ export default function AdminTasksPage() {
                       {task.description && <p className="text-surface-500 text-xs mt-0.5 line-clamp-1">{task.description}</p>}
                     </td>
                     <td className="px-6 py-4 text-surface-400 text-sm">
-                      {(task.project as { name?: string } | null)?.name ?? "—"}
+                      {task.project_name || task.project?.name || (task.project_id ? (() => { console.warn(`Missing project info for valid project_id in task ${task.id}`); return "Project unavailable"; })() : "—")}
                     </td>
                     <td className="px-6 py-4 text-surface-400 text-sm">
-                      {(task.assignee as { full_name?: string } | null)?.full_name ?? "Unassigned"}
+                      {task.developer_name || task.assignee?.full_name || "Unassigned"}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`badge ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>

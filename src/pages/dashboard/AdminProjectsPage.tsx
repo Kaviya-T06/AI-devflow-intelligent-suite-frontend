@@ -116,20 +116,13 @@ function ProjectModal({ initial, onSave, onClose, managers }: ModalProps) {
               value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <div>
               <label className="input-label">Status</label>
               <select className="input w-full" id="project-status" value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}>
                 {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="input-label">Progress ({form.progress}%)</label>
-              <input type="range" min={0} max={100} id="project-progress"
-                value={form.progress} onChange={(e) => setForm({ ...form, progress: Number(e.target.value) })}
-                className="w-full mt-2 accent-primary-500" />
-              {errors.progress && <p className="text-danger-400 text-xs mt-1">{errors.progress}</p>}
             </div>
           </div>
 
@@ -433,7 +426,12 @@ export default function AdminProjectsPage() {
                 <span className={`badge shrink-0 ${STATUS_COLORS[project.status]}`}>{STATUS_LABELS[project.status] ?? project.status}</span>
               </div>
 
-              <ProgressBar value={project.progress} />
+              <div>
+                <ProgressBar value={project.progress} />
+                <p className="text-xs text-surface-400 mt-1 text-center font-medium">
+                  {project.completed_task_count ?? 0} / {project.task_count ?? 0} tasks completed
+                </p>
+              </div>
 
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div>
@@ -479,6 +477,12 @@ export default function AdminProjectsPage() {
                     )}
                   </>
                 )}
+                <button
+                  onClick={() => window.location.href = `/dashboard/admin/tasks?project_id=${project.id}`}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-primary-500/30 text-primary-400 hover:bg-primary-500/10 transition-colors"
+                >
+                  Tasks
+                </button>
               </div>
             </div>
           ))}
