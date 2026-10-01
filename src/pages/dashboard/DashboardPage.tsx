@@ -112,9 +112,12 @@ export default function DashboardPage() {
   const role = (profile?.role ?? "ADMIN") as UserRole;
   const roleConfig = ROLE_CONFIG[role] ?? ROLE_CONFIG.DEVELOPER;
   const isAdmin = role === "ADMIN";
+  const isManager = role === "MANAGER";
+  const showStats = isAdmin || isManager;
 
   const [backendStatus, setBackendStatus] = useState<boolean | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
 
   useEffect(() => {
@@ -122,10 +125,15 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) return;
-    fetchDashboardStats().then(setStats).catch(console.error);
-    fetchRecentActivity(5).then(setRecentActivity).catch(console.error);
-  }, [isAdmin]);
+    if (showStats) {
+      fetchDashboardStats()
+        .then(setStats)
+        .catch(err => setStatsError(err.message || "Failed to load dashboard stats"));
+    }
+    if (isAdmin) {
+      fetchRecentActivity(5).then(setRecentActivity).catch(console.error);
+    }
+  }, [showStats, isAdmin]);
 
   const now = new Date();
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening";
@@ -180,17 +188,66 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Admin stats */}
-      {isAdmin && (
-        <div>
-          <h3 className="section-title mb-4">Platform Overview</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-            <StatCard label="Total Users" value={stats?.totalUsers ?? null} icon="👥" color="text-primary-300" />
-            <StatCard label="Active Projects" value={stats?.activeProjects ?? null} icon="📁" color="text-success-300" />
-            <StatCard label="Open Tasks" value={stats?.openTasks ?? null} icon="✅" color="text-accent-300" />
-            <StatCard label="Workflow Risks" value={stats?.openRisks ?? null} icon="⚠️" color="text-warning-300" />
-            <StatCard label="Repositories" value={stats?.connectedRepos ?? null} icon="📦" color="text-surface-300" />
+      {/* Dashboard Stats (Admin / Manager) */}
+      {showStats && (
+        <div className="space-y-8">
+          <div>
+            <h3 className="section-title mb-4">Project Statistics</h3>
+            {statsError ? (
+              <div className="bg-danger-500/10 border border-danger-500/20 text-danger-400 p-4 rounded-lg flex items-center gap-3">
+                <span className="text-xl">⚠️</span>
+                <p>{statsError}</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                <StatCard label="Total Projects" value={stats?.total_projects ?? null} icon="📁" color="text-primary-300" />
+                <StatCard label="Active" value={stats?.active_projects ?? null} icon="▶️" color="text-success-300" />
+                <StatCard label="Completed" value={stats?.completed_projects ?? null} icon="✅" color="text-accent-300" />
+                <StatCard label="On Hold" value={stats?.on_hold_projects ?? null} icon="⏸️" color="text-warning-300" />
+                <StatCard label="Planning" value={stats?.planning_projects ?? null} icon="📝" color="text-surface-300" />
+                <StatCard label="Archived" value={stats?.archived_projects ?? null} icon="📦" color="text-surface-400" />
+                <StatCard label="Avg Progress (%)" value={stats?.average_progress ?? null} icon="📊" color="text-primary-400" />
+              </div>
+            )}
           </div>
+
+          {!statsError && stats?.recent_projects && stats.recent_projects.length > 0 && (
+            <div>
+              <h3 className="section-title mb-4">Recent Projects</h3>
+              <div className="glass-card overflow-hidden divide-y divide-surface-700/30">
+                {stats.recent_projects.map(p => (
+                  <div key={p.id} className="flex items-center justify-between px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">📁</span>
+                      <div>
+                        <p className="text-surface-100 font-medium text-sm">{p.name}</p>
+                        <p className="text-surface-400 text-xs capitalize">{p.status.replace("_", " ")}</p>
+                      </div>
+                    </div>
+                    <div className="text-right w-32">
+                      <span className="text-surface-300 text-sm font-semibold">{p.progress}%</span>
+                      <div className="w-full h-1.5 bg-surface-700 rounded-full mt-1.5">
+                        <div className="h-full bg-primary-500 rounded-full transition-all duration-500" style={{ width: `${p.progress}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isAdmin && !statsError && (
+            <div>
+              <h3 className="section-title mb-4">Platform Overview</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+                <StatCard label="Total Users" value={stats?.totalUsers ?? null} icon="👥" color="text-primary-300" />
+                <StatCard label="Active Projects" value={stats?.activeProjects ?? null} icon="📁" color="text-success-300" />
+                <StatCard label="Open Tasks" value={stats?.openTasks ?? null} icon="✅" color="text-accent-300" />
+                <StatCard label="Workflow Risks" value={stats?.openRisks ?? null} icon="⚠️" color="text-warning-300" />
+                <StatCard label="Repositories" value={stats?.connectedRepos ?? null} icon="📦" color="text-surface-300" />
+              </div>
+            </div>
+          )}
         </div>
       )}
 

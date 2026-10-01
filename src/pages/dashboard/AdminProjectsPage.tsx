@@ -6,11 +6,11 @@ import {
   fetchAllProjects,
   createProject,
   updateProject,
-  deleteProject,
   fetchAllUsers,
   type UserRecord,
 } from "../../services/adminService";
 import { normalizeRole } from "../../services/profileService";
+import { useAuth } from "../../context/AuthContext";
 import type { Project, ProjectStatus } from "../../types";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
@@ -96,7 +96,7 @@ function ProjectModal({ initial, onSave, onClose, managers }: ModalProps) {
       <div className="glass-card w-full max-w-lg p-6 space-y-5 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-surface-50">{initial?.id ? "Edit Project" : "New Project"}</h3>
-          <button onClick={onClose} className="btn-ghost p-1" id="project-modal-close">
+          <button type="button" onClick={onClose} className="btn-ghost p-1" id="project-modal-close">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -169,7 +169,69 @@ function ProjectModal({ initial, onSave, onClose, managers }: ModalProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Confirm Delete Modal
+// View Details Modal
+// ---------------------------------------------------------------------------
+function ProjectDetailsModal({ project, onClose }: { project: Project; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="glass-card w-full max-w-lg p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-surface-50">{project.name}</h3>
+          <button onClick={onClose} className="btn-ghost p-1">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        
+        <div className="space-y-4">
+          <div>
+            <p className="text-surface-600 text-xs uppercase tracking-wider mb-1">Description</p>
+            <p className="text-surface-200 text-sm leading-relaxed">{project.description || "No description provided."}</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-surface-600 text-xs uppercase tracking-wider mb-1">Status</p>
+              <span className={`badge ${STATUS_COLORS[project.status]}`}>{STATUS_LABELS[project.status] ?? project.status}</span>
+            </div>
+            <div>
+              <p className="text-surface-600 text-xs uppercase tracking-wider mb-1">Progress</p>
+              <div className="mt-1">
+                <ProgressBar value={project.progress} />
+              </div>
+            </div>
+            <div>
+              <p className="text-surface-600 text-xs uppercase tracking-wider mb-1">Project Manager</p>
+              <p className="text-surface-200 text-sm font-medium">
+                {(project.project_manager as { full_name?: string } | null)?.full_name ?? "Unassigned"}
+              </p>
+            </div>
+            <div>
+              <p className="text-surface-600 text-xs uppercase tracking-wider mb-1">Timeline</p>
+              <p className="text-surface-200 text-sm">
+                {project.start_date ? new Date(project.start_date).toLocaleDateString() : "TBD"} – {project.end_date ? new Date(project.end_date).toLocaleDateString() : "TBD"}
+              </p>
+            </div>
+            <div>
+              <p className="text-surface-600 text-xs uppercase tracking-wider mb-1">Created</p>
+              <p className="text-surface-200 text-sm">{project.created_at ? new Date(project.created_at).toLocaleDateString() : "Unknown"}</p>
+            </div>
+            <div>
+              <p className="text-surface-600 text-xs uppercase tracking-wider mb-1">Last Updated</p>
+              <p className="text-surface-200 text-sm">{project.updated_at ? new Date(project.updated_at).toLocaleDateString() : "Unknown"}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="pt-2">
+          <button onClick={onClose} className="btn-secondary w-full">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Confirm Archive Modal
 // ---------------------------------------------------------------------------
 function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: () => void; onClose: () => void }) {
   return (
@@ -179,12 +241,12 @@ function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: (
           <svg className="w-6 h-6 text-danger-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
         </div>
         <div>
-          <h3 className="text-surface-50 font-bold text-lg">Delete Project</h3>
-          <p className="text-surface-400 text-sm mt-1">Delete <span className="text-surface-200 font-medium">{name}</span>? This cannot be undone.</p>
+          <h3 className="text-surface-50 font-bold text-lg">Archive Project</h3>
+          <p className="text-surface-400 text-sm mt-1">Archive <span className="text-surface-200 font-medium">{name}</span>? It will no longer be active.</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={onConfirm} className="btn-danger flex-1" id="project-confirm-delete">Delete</button>
-          <button onClick={onClose}   className="btn-secondary flex-1" id="project-cancel-delete">Cancel</button>
+          <button onClick={onConfirm} className="btn-danger flex-1" id="project-confirm-archive">Archive</button>
+          <button onClick={onClose}   className="btn-secondary flex-1" id="project-cancel-archive">Cancel</button>
         </div>
       </div>
     </div>
@@ -195,6 +257,11 @@ function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: (
 // Main Page
 // ---------------------------------------------------------------------------
 export default function AdminProjectsPage() {
+  const { profile } = useAuth();
+  const role = (profile?.role ?? "DEVELOPER") as "ADMIN" | "MANAGER" | "DEVELOPER";
+  const isAdmin = role === "ADMIN";
+  const isManager = role === "MANAGER";
+  
   const [projects, setProjects] = useState<Project[]>([]);
   const [managers, setManagers] = useState<UserRecord[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -203,7 +270,8 @@ export default function AdminProjectsPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [modal, setModal]       = useState<"add" | "edit" | null>(null);
   const [editing, setEditing]   = useState<Project | null>(null);
-  const [deleting, setDeleting] = useState<Project | null>(null);
+  const [archiving, setArchiving] = useState<Project | null>(null);
+  const [viewing, setViewing]   = useState<Project | null>(null);
   const [toast, setToast]       = useState<string | null>(null);
 
   const load = () => {
@@ -233,34 +301,53 @@ export default function AdminProjectsPage() {
     }), [projects, search, statusFilter]);
 
   const handleSave = async (data: Partial<Project>) => {
-    if (editing) {
-      await updateProject(editing.id, data);
-      setProjects((prev) => prev.map((p) => p.id === editing.id ? { ...p, ...data } : p));
-      showToast("Project updated successfully");
-    } else {
-      const created = await createProject({
-        name: data.name!,
-        description: data.description ?? null,
-        status: data.status ?? "planning",
-        project_manager_id: data.project_manager_id ?? null,
-        project_manager: data.project_manager,
-        progress: data.progress ?? 0,
-        start_date: data.start_date ?? null,
-        end_date: data.end_date ?? null,
-      });
-      setProjects((prev) => [created, ...prev]);
-      showToast("Project created successfully");
+    try {
+      if (editing) {
+        await updateProject(editing.id, {
+          ...data,
+          project_manager_id: data.project_manager_id || null,
+          start_date: data.start_date || null,
+          end_date: data.end_date || null,
+        });
+        setProjects((prev) => prev.map((p) => p.id === editing.id ? { ...p, ...data } : p));
+        showToast("Project updated successfully");
+      } else {
+        const created = await createProject({
+          name: data.name!,
+          description: data.description || null,
+          status: data.status || "planning",
+          project_manager_id: data.project_manager_id || null,
+          progress: data.progress ?? 0,
+          start_date: data.start_date || null,
+          end_date: data.end_date || null,
+        } as any);
+        setProjects((prev) => [created, ...prev]);
+        showToast("Project created successfully");
+      }
+      setModal(null);
+      setEditing(null);
+    } catch (e: any) {
+      setError(e.message || "Failed to save project");
     }
-    setModal(null);
-    setEditing(null);
   };
 
-  const handleDelete = async () => {
-    if (!deleting) return;
-    await deleteProject(deleting.id);
-    setProjects((prev) => prev.filter((p) => p.id !== deleting.id));
-    showToast("Project deleted");
-    setDeleting(null);
+  const handleArchive = async () => {
+    if (!archiving) return;
+    try {
+      await updateProject(archiving.id, { status: "archived" });
+      setProjects((prev) => prev.map(p => p.id === archiving.id ? { ...p, status: "archived" } : p));
+      showToast("Project archived");
+    } catch (e: any) {
+      setError(e.message || "Failed to archive project");
+    } finally {
+      setArchiving(null);
+    }
+  };
+  
+  const canManageProject = (p: Project) => {
+    if (isAdmin) return true;
+    if (isManager && p.project_manager_id === profile?.id) return true;
+    return false;
   };
 
   return (
@@ -278,11 +365,14 @@ export default function AdminProjectsPage() {
           onClose={() => { setModal(null); setEditing(null); }}
         />
       )}
-      {deleting && (
+      {viewing && (
+        <ProjectDetailsModal project={viewing} onClose={() => setViewing(null)} />
+      )}
+      {archiving && (
         <ConfirmModal
-          name={deleting.name}
-          onConfirm={handleDelete}
-          onClose={() => setDeleting(null)}
+          name={archiving.name}
+          onConfirm={handleArchive}
+          onClose={() => setArchiving(null)}
         />
       )}
 
@@ -294,13 +384,15 @@ export default function AdminProjectsPage() {
             {projects.filter((p) => p.status === "active").length} active · {projects.length} total
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="badge-admin">Admin Panel</span>
-          <button onClick={() => { setEditing(null); setModal("add"); }} className="btn-primary text-sm py-2 px-4" id="add-project-btn">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            New Project
-          </button>
-        </div>
+        {(isAdmin || isManager) && (
+          <div className="flex items-center gap-2">
+            <span className="badge-admin">Admin Panel</span>
+            <button onClick={() => { setEditing(null); setModal("add"); }} className="btn-primary text-sm py-2 px-4" id="add-project-btn">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              New Project
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -362,19 +454,31 @@ export default function AdminProjectsPage() {
 
               <div className="flex items-center gap-2 pt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
-                  onClick={() => { setEditing(project); setModal("edit"); }}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-primary-500/30 text-primary-400 hover:bg-primary-500/10 transition-colors"
-                  id={`edit-project-${project.id}`}
+                  onClick={() => setViewing(project)}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-surface-500/30 text-surface-300 hover:bg-surface-500/10 transition-colors"
                 >
-                  Edit
+                  View Details
                 </button>
-                <button
-                  onClick={() => setDeleting(project)}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-danger-500/30 text-danger-400 hover:bg-danger-500/10 transition-colors"
-                  id={`delete-project-${project.id}`}
-                >
-                  Delete
-                </button>
+                {canManageProject(project) && (
+                  <>
+                    <button
+                      onClick={() => { setEditing(project); setModal("edit"); }}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-primary-500/30 text-primary-400 hover:bg-primary-500/10 transition-colors"
+                      id={`edit-project-${project.id}`}
+                    >
+                      Edit
+                    </button>
+                    {project.status !== "archived" && (
+                      <button
+                        onClick={() => setArchiving(project)}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-danger-500/30 text-danger-400 hover:bg-danger-500/10 transition-colors"
+                        id={`archive-project-${project.id}`}
+                      >
+                        Archive
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           ))}

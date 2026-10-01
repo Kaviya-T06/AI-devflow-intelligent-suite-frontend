@@ -38,6 +38,20 @@ export interface DashboardStats {
   openTasks:      number;
   openRisks:      number;
   connectedRepos: number;
+
+  total_projects: number;
+  active_projects: number;
+  completed_projects: number;
+  on_hold_projects: number;
+  planning_projects: number;
+  archived_projects: number;
+  average_progress: number;
+  recent_projects: Array<{
+    id: string;
+    name: string;
+    status: string;
+    progress: number;
+  }>;
 }
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
