@@ -24,6 +24,7 @@ import AdminActivityLogsPage from "./pages/dashboard/AdminActivityLogsPage";
 import AdminWorkflowRisksPage from "./pages/dashboard/AdminWorkflowRisksPage";
 import AdminRepositoriesPage from "./pages/dashboard/AdminRepositoriesPage";
 import AdminSettingsPage from "./pages/dashboard/AdminSettingsPage";
+import AnalyticsPage from "./pages/dashboard/AnalyticsPage";
 // Project Manager pages
 import PMProjectsPage from "./pages/dashboard/PMProjectsPage";
 import PMTeamTasksPage from "./pages/dashboard/PMTeamTasksPage";
@@ -71,7 +72,7 @@ export default function App() {
               </Route>
 
               {/* Future modules */}
-              <Route path="/dashboard/analytics"   element={<ComingSoonPage />} />
+              <Route path="/dashboard/analytics"   element={<AnalyticsPage />} />
               <Route path="/dashboard/bottlenecks" element={<ComingSoonPage />} />
               <Route path="/dashboard/team"        element={<ComingSoonPage />} />
               <Route path="/dashboard/history"     element={<ComingSoonPage />} />

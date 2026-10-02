@@ -48,7 +48,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: "repositories",   label: "Repositories",     path: "/dashboard/repositories",       available: true,  roles: ["ADMIN"], icon: <RepositoriesIcon />    },
   { id: "settings",        label: "Settings",         path: "/dashboard/settings",           available: true,  roles: ["ADMIN"], icon: <SettingsIcon />        },
   // Future items
-  { id: "analytics",      label: "Analytics",        path: "/dashboard/analytics",          available: false, roles: ["ADMIN"], icon: <AnalyticsIcon />       },
+  { id: "analytics",      label: "Analytics",        path: "/dashboard/analytics",          available: true, roles: ["ADMIN", "MANAGER", "DEVELOPER"], icon: <AnalyticsIcon />       },
   { id: "ai-insights",    label: "AI Insights",       path: "/dashboard/ai-insights",        available: false, roles: ["ADMIN"], icon: <AIIcon />              },
 ];
 
