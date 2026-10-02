@@ -29,6 +29,7 @@ import AnalyticsPage from "./pages/dashboard/AnalyticsPage";
 import PMProjectsPage from "./pages/dashboard/PMProjectsPage";
 import PMTeamTasksPage from "./pages/dashboard/PMTeamTasksPage";
 import PMActivityPage from "./pages/dashboard/PMActivityPage";
+import PMGitHubIntegrationPage from "./pages/dashboard/PMGitHubIntegrationPage";
 
 export default function App() {
   return (
@@ -46,37 +47,84 @@ export default function App() {
               <Route path="/dashboard/profile" element={<ProfilePage />} />
 
               {/* Developer-only modules */}
-              <Route element={<RoleRoute allowedRoles={["DEVELOPER", "TEAM_MEMBER"]} />}>
-                <Route path="/dashboard/my-tasks"       element={<MyTasksPage />} />
-                <Route path="/dashboard/my-projects"    element={<MyProjectsPage />} />
-                <Route path="/dashboard/my-activity"    element={<MyActivityPage />} />
-                <Route path="/dashboard/notifications"  element={<NotificationsPage />} />
+              <Route
+                element={
+                  <RoleRoute allowedRoles={["DEVELOPER", "TEAM_MEMBER"]} />
+                }
+              >
+                <Route path="/dashboard/my-tasks" element={<MyTasksPage />} />
+                <Route
+                  path="/dashboard/my-projects"
+                  element={<MyProjectsPage />}
+                />
+                <Route
+                  path="/dashboard/my-activity"
+                  element={<MyActivityPage />}
+                />
+                <Route
+                  path="/dashboard/notifications"
+                  element={<NotificationsPage />}
+                />
               </Route>
 
               {/* Project Manager modules */}
               <Route element={<RoleRoute allowedRoles={["MANAGER"]} />}>
-                <Route path="/dashboard/pm-projects"    element={<PMProjectsPage />} />
-                <Route path="/dashboard/pm-team-tasks"  element={<PMTeamTasksPage />} />
-                <Route path="/dashboard/pm-activity"    element={<PMActivityPage />} />
+                <Route
+                  path="/dashboard/pm-projects"
+                  element={<PMProjectsPage />}
+                />
+                <Route
+                  path="/dashboard/pm-team-tasks"
+                  element={<PMTeamTasksPage />}
+                />
+                <Route
+                  path="/dashboard/pm-activity"
+                  element={<PMActivityPage />}
+                />
+                <Route
+                  path="/dashboard/github-integration"
+                  element={<PMGitHubIntegrationPage />}
+                />
               </Route>
 
               {/* Admin-only modules */}
               <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
-                <Route path="/dashboard/users"          element={<AdminUsersPage />} />
-                <Route path="/dashboard/projects"       element={<AdminProjectsPage />} />
-                <Route path="/dashboard/tasks"          element={<AdminTasksPage />} />
-                <Route path="/dashboard/activity"       element={<AdminActivityLogsPage />} />
-                <Route path="/dashboard/workflow-risks" element={<AdminWorkflowRisksPage />} />
-                <Route path="/dashboard/repositories"   element={<AdminRepositoriesPage />} />
-                <Route path="/dashboard/settings"       element={<AdminSettingsPage />} />
+                <Route path="/dashboard/users" element={<AdminUsersPage />} />
+                <Route
+                  path="/dashboard/projects"
+                  element={<AdminProjectsPage />}
+                />
+                <Route path="/dashboard/tasks" element={<AdminTasksPage />} />
+                <Route
+                  path="/dashboard/activity"
+                  element={<AdminActivityLogsPage />}
+                />
+                <Route
+                  path="/dashboard/workflow-risks"
+                  element={<AdminWorkflowRisksPage />}
+                />
+                <Route
+                  path="/dashboard/repositories"
+                  element={<AdminRepositoriesPage />}
+                />
+                <Route
+                  path="/dashboard/settings"
+                  element={<AdminSettingsPage />}
+                />
               </Route>
 
               {/* Future modules */}
-              <Route path="/dashboard/analytics"   element={<AnalyticsPage />} />
-              <Route path="/dashboard/bottlenecks" element={<ComingSoonPage />} />
-              <Route path="/dashboard/team"        element={<ComingSoonPage />} />
-              <Route path="/dashboard/history"     element={<ComingSoonPage />} />
-              <Route path="/dashboard/ai-insights" element={<ComingSoonPage />} />
+              <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
+              <Route
+                path="/dashboard/bottlenecks"
+                element={<ComingSoonPage />}
+              />
+              <Route path="/dashboard/team" element={<ComingSoonPage />} />
+              <Route path="/dashboard/history" element={<ComingSoonPage />} />
+              <Route
+                path="/dashboard/ai-insights"
+                element={<ComingSoonPage />}
+              />
             </Route>
           </Route>
 
