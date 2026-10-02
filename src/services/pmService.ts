@@ -174,3 +174,36 @@ export interface AssignableUser {
 export async function fetchAssignableUsers(): Promise<AssignableUser[]> {
   return apiFetch<AssignableUser[]>("/dashboard/pm-users");
 }
+
+// ---------------------------------------------------------------------------
+// Workflow Risks (PM-scoped)
+// ---------------------------------------------------------------------------
+
+import type { WorkflowRisk } from "../types";
+
+/**
+ * Fetch workflow risks for the PM's managed projects.
+ * Backend scopes results to projects where current user is project_manager.
+ */
+export async function fetchPMRisks(filters?: {
+  status?: string;
+  severity?: string;
+  risk_type?: string;
+  project_id?: string;
+}): Promise<WorkflowRisk[]> {
+  const params = new URLSearchParams();
+  if (filters?.status)     params.set("status",     filters.status);
+  if (filters?.severity)   params.set("severity",   filters.severity);
+  if (filters?.risk_type)  params.set("risk_type",  filters.risk_type);
+  if (filters?.project_id) params.set("project_id", filters.project_id);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch<WorkflowRisk[]>(`/workflow-risks${qs}`);
+}
+
+/**
+ * Fetch workflow risks relevant to the current developer's tasks.
+ */
+export async function fetchMyRisks(): Promise<WorkflowRisk[]> {
+  return apiFetch<WorkflowRisk[]>("/workflow-risks");
+}
+

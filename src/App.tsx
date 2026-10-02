@@ -30,6 +30,9 @@ import PMProjectsPage from "./pages/dashboard/PMProjectsPage";
 import PMTeamTasksPage from "./pages/dashboard/PMTeamTasksPage";
 import PMActivityPage from "./pages/dashboard/PMActivityPage";
 import PMGitHubIntegrationPage from "./pages/dashboard/PMGitHubIntegrationPage";
+import PMWorkflowRisksPage from "./pages/dashboard/PMWorkflowRisksPage";
+// Developer pages
+import DeveloperWorkflowRisksPage from "./pages/dashboard/DeveloperWorkflowRisksPage";
 
 export default function App() {
   return (
@@ -65,6 +68,10 @@ export default function App() {
                   path="/dashboard/notifications"
                   element={<NotificationsPage />}
                 />
+                <Route
+                  path="/dashboard/my-risks"
+                  element={<DeveloperWorkflowRisksPage />}
+                />
               </Route>
 
               {/* Project Manager modules */}
@@ -84,6 +91,10 @@ export default function App() {
                 <Route
                   path="/dashboard/github-integration"
                   element={<PMGitHubIntegrationPage />}
+                />
+                <Route
+                  path="/dashboard/pm-workflow-risks"
+                  element={<PMWorkflowRisksPage />}
                 />
               </Route>
 

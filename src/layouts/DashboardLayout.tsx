@@ -221,6 +221,14 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: <ActivityIcon />,
   },
   {
+    id: "my-risks",
+    label: "My Workflow",
+    path: "/dashboard/my-risks",
+    available: true,
+    roles: ["DEVELOPER"],
+    icon: <WorkflowRisksIcon />,
+  },
+  {
     id: "notifications",
     label: "Notifications",
     path: "/dashboard/notifications",
@@ -252,6 +260,14 @@ const ALL_NAV_ITEMS: NavItem[] = [
     available: true,
     roles: ["MANAGER"],
     icon: <ActivityIcon />,
+  },
+  {
+    id: "pm-workflow-risks",
+    label: "Workflow Risks",
+    path: "/dashboard/pm-workflow-risks",
+    available: true,
+    roles: ["MANAGER"],
+    icon: <WorkflowRisksIcon />,
   },
   {
     id: "pm-github",
@@ -570,7 +586,7 @@ function TopHeader({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
       <div className="flex items-center gap-3">
         <span className="hidden sm:flex badge bg-primary-500/15 text-primary-300 border border-primary-500/20">
-          Milestone 3
+          Milestone 5
         </span>
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-xs">
           {profile?.full_name

@@ -141,16 +141,21 @@ export interface ActivityLog {
 // ---------------------------------------------------------------------------
 
 export type RiskSeverity = "Low" | "Medium" | "High" | "Critical";
-export type RiskStatus = "Open" | "Monitoring" | "Resolved";
+export type RiskStatus = "OPEN" | "RESOLVED";
 
 export interface WorkflowRisk {
   id: string;
-  project_id: string | null;
-  task_id: string | null;
   risk_type: string;
-  severity: RiskSeverity;
+  title: string;
   description: string;
+  severity: RiskSeverity;
+  project_id: string | null;
+  project_name?: string | null;
+  task_id: string | null;
   status: RiskStatus;
+  is_resolved: boolean;
+  detected_at: string;
+  resolved_at?: string | null;
   created_at: string;
   updated_at: string;
 }
