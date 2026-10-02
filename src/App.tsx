@@ -30,6 +30,7 @@ import PMProjectsPage from "./pages/dashboard/PMProjectsPage";
 import PMTeamTasksPage from "./pages/dashboard/PMTeamTasksPage";
 import PMActivityPage from "./pages/dashboard/PMActivityPage";
 import PMGitHubIntegrationPage from "./pages/dashboard/PMGitHubIntegrationPage";
+import AIContinuityPage from "./pages/dashboard/AIContinuityPage";
 
 export default function App() {
   return (
@@ -65,6 +66,10 @@ export default function App() {
                   path="/dashboard/notifications"
                   element={<NotificationsPage />}
                 />
+                <Route
+                  path="/dashboard/ai-continuity"
+                  element={<AIContinuityPage />}
+                />
               </Route>
 
               {/* Project Manager modules */}
@@ -84,6 +89,10 @@ export default function App() {
                 <Route
                   path="/dashboard/github-integration"
                   element={<PMGitHubIntegrationPage />}
+                />
+                <Route
+                  path="/dashboard/pm-ai-continuity"
+                  element={<AIContinuityPage />}
                 />
               </Route>
 
