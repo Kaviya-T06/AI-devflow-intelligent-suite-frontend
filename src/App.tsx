@@ -70,12 +70,12 @@ export default function App() {
                   element={<NotificationsPage />}
                 />
                 <Route
-                  path="/dashboard/my-risks"
-                  element={<DeveloperWorkflowRisksPage />}
-                />
-                <Route
                   path="/dashboard/ai-continuity"
                   element={<AIContinuityPage />}
+                />
+                <Route
+                  path="/dashboard/my-risks"
+                  element={<DeveloperWorkflowRisksPage />}
                 />
               </Route>
 

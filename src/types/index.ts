@@ -130,7 +130,9 @@ export interface ActivityLog {
   action: string;
   entity_type: string;
   entity_id: string | null;
+  project_id?: string | null;
   description: string;
+  metadata?: Record<string, any> | null;
   created_at: string;
   // Joined
   user?: Pick<Profile, "id" | "full_name" | "email"> | null;

@@ -12,6 +12,7 @@ import {
 import { normalizeRole } from "../../services/profileService";
 import { useAuth } from "../../context/AuthContext";
 import type { Project, ProjectStatus } from "../../types";
+import ProjectHistoryModal from "../../components/dashboard/ProjectHistoryModal";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   active:    "bg-success-500/15 text-success-300 border-success-500/20",
@@ -265,6 +266,7 @@ export default function AdminProjectsPage() {
   const [editing, setEditing]   = useState<Project | null>(null);
   const [archiving, setArchiving] = useState<Project | null>(null);
   const [viewing, setViewing]   = useState<Project | null>(null);
+  const [historyProject, setHistoryProject] = useState<Project | null>(null);
   const [toast, setToast]       = useState<string | null>(null);
 
   const load = () => {
@@ -457,6 +459,12 @@ export default function AdminProjectsPage() {
                 >
                   View Details
                 </button>
+                <button
+                  onClick={() => setHistoryProject(project)}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-accent-500/30 text-accent-400 hover:bg-accent-500/10 transition-colors"
+                >
+                  History
+                </button>
                 {canManageProject(project) && (
                   <>
                     <button
@@ -493,6 +501,14 @@ export default function AdminProjectsPage() {
         <p className="text-surface-600 text-xs text-right">
           Showing {filtered.length} of {projects.length} projects
         </p>
+      )}
+
+      {historyProject && (
+        <ProjectHistoryModal
+          projectId={historyProject.id}
+          projectName={historyProject.name}
+          onClose={() => setHistoryProject(null)}
+        />
       )}
     </div>
   );
