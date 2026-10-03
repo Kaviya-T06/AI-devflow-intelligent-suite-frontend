@@ -31,6 +31,9 @@ import PMTeamTasksPage from "./pages/dashboard/PMTeamTasksPage";
 import PMActivityPage from "./pages/dashboard/PMActivityPage";
 import PMGitHubIntegrationPage from "./pages/dashboard/PMGitHubIntegrationPage";
 import AIContinuityPage from "./pages/dashboard/AIContinuityPage";
+import PMWorkflowRisksPage from "./pages/dashboard/PMWorkflowRisksPage";
+// Developer pages
+import DeveloperWorkflowRisksPage from "./pages/dashboard/DeveloperWorkflowRisksPage";
 
 export default function App() {
   return (
@@ -70,6 +73,10 @@ export default function App() {
                   path="/dashboard/ai-continuity"
                   element={<AIContinuityPage />}
                 />
+                <Route
+                  path="/dashboard/my-risks"
+                  element={<DeveloperWorkflowRisksPage />}
+                />
               </Route>
 
               {/* Project Manager modules */}
@@ -93,6 +100,10 @@ export default function App() {
                 <Route
                   path="/dashboard/pm-ai-continuity"
                   element={<AIContinuityPage />}
+                />
+                <Route
+                  path="/dashboard/pm-workflow-risks"
+                  element={<PMWorkflowRisksPage />}
                 />
               </Route>
 

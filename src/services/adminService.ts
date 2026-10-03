@@ -52,6 +52,15 @@ export interface DashboardStats {
     status: string;
     progress: number;
   }>;
+
+  // Risk breakdown
+  high_risks: number;
+  medium_risks: number;
+  low_risks: number;
+  overdue_tasks_risks: number;
+  review_delay_risks: number;
+  stuck_tasks_risks: number;
+  project_delay_risks: number;
 }
 
 export async function fetchDashboardStats(): Promise<DashboardStats> {
@@ -184,8 +193,19 @@ export async function deleteTask(id: string): Promise<void> {
 // Workflow risks
 // ---------------------------------------------------------------------------
 
-export async function fetchAllRisks(): Promise<WorkflowRisk[]> {
-  return apiFetch<WorkflowRisk[]>("/workflow-risks");
+export async function fetchAllRisks(filters?: {
+  status?: string;
+  severity?: string;
+  risk_type?: string;
+  project_id?: string;
+}): Promise<WorkflowRisk[]> {
+  const params = new URLSearchParams();
+  if (filters?.status)     params.set("status",     filters.status);
+  if (filters?.severity)   params.set("severity",   filters.severity);
+  if (filters?.risk_type)  params.set("risk_type",  filters.risk_type);
+  if (filters?.project_id) params.set("project_id", filters.project_id);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch<WorkflowRisk[]>(`/workflow-risks${qs}`);
 }
 
 export async function updateRiskStatus(
