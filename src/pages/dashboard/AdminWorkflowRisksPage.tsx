@@ -74,7 +74,6 @@ export default function AdminWorkflowRisksPage() {
   const overdueCount    = risks.filter((r) => r.risk_type === "OVERDUE_TASK" && r.status === "OPEN").length;
   const reviewCount     = risks.filter((r) => r.risk_type === "REVIEW_DELAY" && r.status === "OPEN").length;
   const stuckCount      = risks.filter((r) => r.risk_type === "STUCK_TASK" && r.status === "OPEN").length;
-  const projectDelayCount = risks.filter((r) => r.risk_type === "PROJECT_DELAY" && r.status === "OPEN").length;
 
   // Projects that have risks (for filter dropdown)
   const riskyProjects = allProjects.filter((p) => risks.some((r) => r.project_id === p.id));

@@ -33,6 +33,7 @@ import PMGitHubIntegrationPage from "./pages/dashboard/PMGitHubIntegrationPage";
 import PMWorkflowRisksPage from "./pages/dashboard/PMWorkflowRisksPage";
 // Developer pages
 import DeveloperWorkflowRisksPage from "./pages/dashboard/DeveloperWorkflowRisksPage";
+import AIContinuityPage from "./pages/dashboard/AIContinuityPage";
 
 export default function App() {
   return (
@@ -72,6 +73,10 @@ export default function App() {
                   path="/dashboard/my-risks"
                   element={<DeveloperWorkflowRisksPage />}
                 />
+                <Route
+                  path="/dashboard/ai-continuity"
+                  element={<AIContinuityPage />}
+                />
               </Route>
 
               {/* Project Manager modules */}
@@ -95,6 +100,15 @@ export default function App() {
                 <Route
                   path="/dashboard/pm-workflow-risks"
                   element={<PMWorkflowRisksPage />}
+                />
+              </Route>
+
+              <Route
+                element={<RoleRoute allowedRoles={["MANAGER", "ADMIN"]} />}
+              >
+                <Route
+                  path="/dashboard/pm-ai-continuity"
+                  element={<AIContinuityPage />}
                 />
               </Route>
 

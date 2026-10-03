@@ -32,7 +32,6 @@ export interface GitHubRepository {
   html_url: string;
   default_branch: string;
   connected_by?: string;
-  connected_by?: string;
   created_at: string;
   updated_at: string;
   last_synced_at?: string;

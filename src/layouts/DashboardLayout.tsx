@@ -277,6 +277,22 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER"],
     icon: <RepositoriesIcon />,
   },
+  {
+    id: "pm-ai-continuity",
+    label: "AI Continuity",
+    path: "/dashboard/pm-ai-continuity",
+    available: true,
+    roles: ["MANAGER", "ADMIN"],
+    icon: <AIIcon />,
+  },
+  {
+    id: "dev-ai-continuity",
+    label: "AI Continuity",
+    path: "/dashboard/ai-continuity",
+    available: true,
+    roles: ["DEVELOPER"],
+    icon: <AIIcon />,
+  },
   // Admin-only nav items
   {
     id: "users",
