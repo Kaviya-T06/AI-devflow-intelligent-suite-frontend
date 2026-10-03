@@ -8,6 +8,7 @@ import type {
   PMActivityItem,
   Task,
   Project,
+  ActivityLog,
 } from "../types";
 
 const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -205,5 +206,9 @@ export async function fetchPMRisks(filters?: {
  */
 export async function fetchMyRisks(): Promise<WorkflowRisk[]> {
   return apiFetch<WorkflowRisk[]>("/workflow-risks");
+}
+
+export async function fetchProjectHistory(projectId: string): Promise<ActivityLog[]> {
+  return apiFetch<ActivityLog[]>(`/projects/${projectId}/history`);
 }
 

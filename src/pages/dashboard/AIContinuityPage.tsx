@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import { fetchAllProjects } from "../../services/adminService";
 import { generateContinuitySummary, askContinuityQuestion } from "../../services/continuityService";
 import type { ContinuitySummary } from "../../services/continuityService";
-import type { ProjectSummary } from "../../types";
 
 export default function AIContinuityPage() {
   const [searchParams, setSearchParams] = useSearchParams();

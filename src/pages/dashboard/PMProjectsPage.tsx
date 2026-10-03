@@ -5,8 +5,8 @@
  */
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchPMDashboardStats, updateManagedProject } from "../../services/pmService";
-import type { PMDashboardStats, ProjectSummary, DeveloperWorkload } from "../../types";
+import { fetchPMDashboardStats, updateManagedProject, fetchProjectHistory } from "../../services/pmService";
+import type { PMDashboardStats, ProjectSummary, DeveloperWorkload, ActivityLog } from "../../types";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,6 +79,8 @@ const MANUAL_STATUS_OPTIONS = [
   { value: "on_hold",  label: "On Hold" },
 ];
 
+import ProjectHistoryModal from "../../components/dashboard/ProjectHistoryModal";
+
 // ---------------------------------------------------------------------------
 // Project Card
 // ---------------------------------------------------------------------------
@@ -86,9 +88,11 @@ const MANUAL_STATUS_OPTIONS = [
 function ProjectCard({
   project,
   onStatusChange,
+  onViewHistory,
 }: {
   project: ProjectSummary;
   onStatusChange: (id: string, status: string) => void;
+  onViewHistory: (project: ProjectSummary) => void;
 }) {
   const navigate = useNavigate();
   const [editingStatus, setEditingStatus] = useState(false);
@@ -235,13 +239,19 @@ function ProjectCard({
         </div>
       )}
 
-      {/* View Tasks link */}
-      <div className="pt-2 border-t border-surface-700/30">
+      {/* View Tasks & History link */}
+      <div className="pt-2 border-t border-surface-700/30 flex justify-between">
         <button
           onClick={() => navigate(`/dashboard/pm-team-tasks?project=${project.id}`)}
           className="text-primary-400 text-xs hover:text-primary-300 hover:underline transition-colors"
         >
           View Tasks →
+        </button>
+        <button
+          onClick={() => onViewHistory(project)}
+          className="text-accent-400 text-xs hover:text-accent-300 hover:underline transition-colors"
+        >
+          View History →
         </button>
       </div>
     </div>
@@ -257,6 +267,7 @@ export default function PMProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [historyProject, setHistoryProject] = useState<ProjectSummary | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -411,11 +422,19 @@ export default function PMProjectsPage() {
                   key={project.id}
                   project={project}
                   onStatusChange={handleStatusChange}
+                  onViewHistory={setHistoryProject}
                 />
               ))}
             </div>
           )}
         </>
+      )}
+      {historyProject && (
+        <ProjectHistoryModal
+          projectId={historyProject.id}
+          projectName={historyProject.name}
+          onClose={() => setHistoryProject(null)}
+        />
       )}
     </div>
   );
