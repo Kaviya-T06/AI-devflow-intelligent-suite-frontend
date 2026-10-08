@@ -35,6 +35,20 @@ export interface ContinuitySummary {
   important_context: string;
   what_next_developer_should_know: string;
   recommended_next_steps: string;
+  raw_context?: {
+    project: any;
+    tasks: any[];
+    risks: any[];
+    github: {
+      repository: string | null;
+      commits: any[];
+      pull_requests: any[];
+      issues: any[];
+    };
+    verified_mappings: string[];
+    unmapped_commits: any[];
+    unmapped_prs: any[];
+  };
 }
 
 export async function generateContinuitySummary(projectId: string, token: string): Promise<ContinuitySummary> {
