@@ -13,7 +13,9 @@ import {
   updateManagedTask,
   deleteManagedTask,
   fetchAssignableUsers,
+  fetchTaskRecommendations,
   type AssignableUser,
+  type TaskRecommendation,
 } from "../../services/pmService";
 import type { Task, PMDashboardStats } from "../../types";
 
@@ -66,6 +68,8 @@ interface TaskFormData {
   assigned_to: string;
   priority: string;
   due_date: string;
+  required_skills: string;
+  min_experience_years: number;
 }
 
 function TaskModal({
@@ -92,6 +96,8 @@ function TaskModal({
     due_date: task?.due_date
       ? new Date(task.due_date).toISOString().split("T")[0]
       : "",
+    required_skills: task?.required_skills?.join(", ") ?? "",
+    min_experience_years: task?.min_experience_years ?? 0,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +122,8 @@ function TaskModal({
       const project_id = form.project_id || null;
       const assigned_to = form.assigned_to || null;
       const due_date = form.due_date || null;
+      const required_skills = form.required_skills.split(",").map(s => s.trim()).filter(Boolean);
+      const minExp = parseInt(String(form.min_experience_years), 10) || 0;
 
       if (mode === "create") {
         await createManagedTask({
@@ -126,6 +134,8 @@ function TaskModal({
           priority: form.priority,
           due_date,
           status: "TODO",
+          required_skills,
+          min_experience_years: minExp,
         });
       } else if (task) {
         await updateManagedTask(task.id, {
@@ -135,6 +145,8 @@ function TaskModal({
           assigned_to,
           priority: form.priority,
           due_date,
+          required_skills,
+          min_experience_years: minExp,
         });
       }
 
@@ -270,6 +282,34 @@ function TaskModal({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            {/* Required Skills */}
+            <div>
+              <label className="block text-surface-400 text-xs font-medium mb-1">Required Skills (comma-separated)</label>
+              <input
+                type="text"
+                name="required_skills"
+                value={form.required_skills}
+                onChange={handleChange}
+                placeholder="React, Node.js"
+                className="w-full bg-surface-800 border border-surface-700/50 rounded-lg px-3 py-2 text-surface-100 text-sm focus:outline-none focus:border-primary-500/50"
+              />
+            </div>
+
+            {/* Min Experience */}
+            <div>
+              <label className="block text-surface-400 text-xs font-medium mb-1">Min Experience (Years)</label>
+              <input
+                type="number"
+                name="min_experience_years"
+                value={form.min_experience_years}
+                onChange={handleChange}
+                min="0"
+                className="w-full bg-surface-800 border border-surface-700/50 rounded-lg px-3 py-2 text-surface-100 text-sm focus:outline-none focus:border-primary-500/50"
+              />
+            </div>
+          </div>
+
           {/* Note for PM about status */}
           <p className="text-surface-600 text-xs italic">
             Note: Task status is updated by the assigned developer. You can manage assignments, priority, and due dates here.
@@ -354,6 +394,176 @@ function DeleteConfirm({
 }
 
 // ---------------------------------------------------------------------------
+// Recommendations Modal
+// ---------------------------------------------------------------------------
+
+function RecommendationsModal({
+  task,
+  onClose,
+  onAssign,
+}: {
+  task: Task;
+  onClose: () => void;
+  onAssign: (developerId: string) => Promise<void>;
+}) {
+  const [recommendations, setRecommendations] = useState<TaskRecommendation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await fetchTaskRecommendations(task.id);
+        setRecommendations(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load recommendations");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [task.id]);
+
+  const handleAssign = async (developerId: string) => {
+    if (!window.confirm("Are you sure you want to assign this developer?")) return;
+    setAssigningId(developerId);
+    setError(null);
+    try {
+      await onAssign(developerId);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to assign task");
+      setAssigningId(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="glass-card w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 animate-fade-in flex flex-col">
+        <div className="flex items-center justify-between mb-5 shrink-0">
+          <div>
+            <h3 className="text-surface-50 font-bold text-xl">AI Recommendations</h3>
+            <p className="text-surface-400 text-sm mt-1">
+              For task: <span className="text-surface-200 font-medium">{task.title}</span>
+            </p>
+          </div>
+          <button onClick={onClose} className="text-surface-400 hover:text-surface-200 transition-colors">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-danger-500/10 border border-danger-500/20 text-danger-400 p-3 rounded-lg mb-4 text-sm flex items-center gap-2 shrink-0">
+            ⚠️ {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-12 space-y-4">
+            <svg className="w-8 h-8 animate-spin text-primary-500" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3V4a10 10 0 100 20v-4l-3 3 3 3v-4a8 8 0 01-8-8z" />
+            </svg>
+            <p className="text-surface-400">Analyzing developers...</p>
+          </div>
+        ) : recommendations.length === 0 ? (
+          <div className="flex-1 text-center py-12">
+            <p className="text-surface-300 font-medium text-lg">No recommendations available</p>
+            <p className="text-surface-500 text-sm mt-2">Try updating the task requirements or adding skills to your team's profiles.</p>
+          </div>
+        ) : (
+          <div className="flex-1 space-y-4">
+            <div className="bg-surface-800/40 p-3 rounded-lg border border-surface-700/50 flex items-start gap-3">
+              <svg className="w-5 h-5 text-primary-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-surface-300 leading-relaxed">
+                Match scores are AI-generated recommendations based on skills, experience, and current workload. They are not a guarantee of performance.
+              </p>
+            </div>
+            
+            {recommendations.map((rec) => (
+              <div key={rec.developer_id} className="bg-surface-800 border border-surface-700/50 rounded-xl p-5 hover:border-primary-500/30 transition-colors">
+                <div className="flex justify-between items-start mb-4 gap-4">
+                  <div>
+                    <h4 className="text-lg font-bold text-surface-50">{rec.developer_name}</h4>
+                    <p className="text-sm text-surface-400 mt-1">{rec.experience_relevance}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-2xl font-bold text-primary-400">{Math.round(rec.match_score * 100)}%</div>
+                    <div className="text-xs text-surface-500">Match Score</div>
+                  </div>
+                </div>
+
+                {rec.workload_warning && (
+                  <div className="bg-warning-500/10 border border-warning-500/20 text-warning-400 p-2 rounded text-xs mb-4 flex items-start gap-2">
+                    <span className="shrink-0 mt-0.5">⚠️</span>
+                    <span>{rec.workload_warning}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm">
+                  <div>
+                    <strong className="text-surface-300 block mb-1">Matched Skills</strong>
+                    {rec.matched_skills.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {rec.matched_skills.map(s => (
+                          <span key={s} className="px-2 py-0.5 bg-success-500/10 text-success-300 rounded text-xs border border-success-500/20">{s}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-surface-500 text-xs">None</span>
+                    )}
+                  </div>
+                  <div>
+                    <strong className="text-surface-300 block mb-1">Missing Skills</strong>
+                    {rec.missing_skills.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {rec.missing_skills.map(s => (
+                          <span key={s} className="px-2 py-0.5 bg-danger-500/10 text-danger-300 rounded text-xs border border-danger-500/20">{s}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-surface-500 text-xs">None</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-surface-900/50 p-3 rounded text-sm text-surface-300 mb-4 italic">
+                  "{rec.explanation}"
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleAssign(rec.developer_id)}
+                    disabled={assigningId !== null}
+                    className="bg-primary-600 hover:bg-primary-500 disabled:bg-surface-700 disabled:text-surface-400 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    {assigningId === rec.developer_id ? (
+                      "Assigning..."
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Confirm Assignment
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -376,6 +586,7 @@ export default function PMTeamTasksPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
+  const [recommendingTask, setRecommendingTask] = useState<Task | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -394,6 +605,12 @@ export default function PMTeamTasksPage() {
       setLoading(false);
     }
   }, [projectFilter]);
+
+  const handleAssignFromRecommendation = async (developerId: string) => {
+    if (!recommendingTask) return;
+    await updateManagedTask(recommendingTask.id, { assigned_to: developerId });
+    await loadData();
+  };
 
   useEffect(() => {
     loadData();
@@ -594,6 +811,15 @@ export default function PMTeamTasksPage() {
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <button
+                                onClick={() => setRecommendingTask(task)}
+                                className="text-primary-400 hover:text-primary-300 transition-colors bg-primary-500/10 p-1.5 rounded"
+                                title="AI Developer Recommendation"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                              </button>
+                              <button
                                 onClick={() => setEditingTask(task)}
                                 className="text-surface-400 hover:text-primary-300 transition-colors"
                                 title="Edit task"
@@ -652,6 +878,13 @@ export default function PMTeamTasksPage() {
           task={deletingTask}
           onConfirm={() => { setDeletingTask(null); loadData(); }}
           onCancel={() => setDeletingTask(null)}
+        />
+      )}
+      {recommendingTask && (
+        <RecommendationsModal
+          task={recommendingTask}
+          onClose={() => setRecommendingTask(null)}
+          onAssign={handleAssignFromRecommendation}
         />
       )}
     </div>
