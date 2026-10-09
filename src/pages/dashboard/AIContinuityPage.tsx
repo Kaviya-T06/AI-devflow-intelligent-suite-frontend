@@ -52,8 +52,23 @@ export default function AIContinuityPage() {
       const token = localStorage.getItem("access_token") || "";
       const result = await generateContinuitySummary(selectedProjectId, token);
       setSummary(result);
-    } catch (err) {
-      setSummaryError(err instanceof Error ? err.message : "Failed to generate summary");
+    } catch (err: any) {
+      setSummaryError(err.message || "Failed to generate summary");
+      if (err.raw_context) {
+        setSummary({
+          project_overview: "Provider Error: " + err.message,
+          previous_developer_work: "AI analysis could not be completed. Review the 'Project History' tab manually.",
+          current_work: "Cannot retrieve AI insights at this time. Refer to the raw project tasks below.",
+          pending_work: "Check the 'Tasks' dashboard directly to see pending work.",
+          blocked_overdue_work: "Check the 'Workflow Risks' dashboard for any active blockers.",
+          recent_github_activity: "Refer to the GitHub integration module for raw commits and PRs.",
+          known_issues: `Provider Error: ${err.message}`,
+          important_context: "The backend successfully gathered your project context, but the final AI summarization step failed.",
+          what_next_developer_should_know: "You can still perform all project operations, browse tasks, and view history manually.",
+          recommended_next_steps: "Check backend logs for the exact error. Verify AI_API_KEY and AI_MODEL in .env, then try again.",
+          raw_context: err.raw_context
+        } as ContinuitySummary);
+      }
     } finally {
       setLoadingSummary(false);
     }
@@ -93,10 +108,10 @@ export default function AIContinuityPage() {
       }
 
       setChatLog((prev) => [...prev, { role: "ai", text: answerText }]);
-    } catch (err) {
+    } catch (err: any) {
       setChatLog((prev) => [
         ...prev,
-        { role: "ai", text: "⚠️ AI answer temporarily unavailable.\nPlease try again shortly." },
+        { role: "ai", text: `⚠️ AI answer temporarily unavailable.\nError: ${err.message}` },
       ]);
     } finally {
       setAsking(false);

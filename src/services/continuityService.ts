@@ -18,7 +18,13 @@ async function request<T>(
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(errorBody.detail || `HTTP ${response.status}`);
+    const detail = errorBody.detail;
+    if (detail && typeof detail === "object" && detail.message) {
+      const error: any = new Error(detail.message);
+      error.raw_context = detail.raw_context;
+      throw error;
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
   }
 
   return response.json() as Promise<T>;
