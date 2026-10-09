@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fetchAllProjects } from "../../services/adminService";
 import { generateContinuitySummary, askContinuityQuestion } from "../../services/continuityService";
@@ -66,12 +66,22 @@ export default function AIContinuityPage() {
     if (!currentQ.trim() || !selectedProjectId) return;
 
     if (!presetQ) setQuestion("");
+
+    // Prepare bounded conversation history (latest 10 messages) excluding error messages
+    const historyMessages = chatLog
+      .filter((m) => !m.text.includes("AI answer temporarily unavailable") && !m.text.includes("⚠️"))
+      .slice(-10)
+      .map((m) => ({
+        role: (m.role === "ai" ? "assistant" : "user") as "assistant" | "user",
+        content: m.text,
+      }));
+
     setChatLog((prev) => [...prev, { role: "user", text: currentQ }]);
     setAsking(true);
 
     try {
       const token = localStorage.getItem("access_token") || "";
-      const result = await askContinuityQuestion(selectedProjectId, currentQ, token);
+      const result = await askContinuityQuestion(selectedProjectId, currentQ, token, historyMessages);
 
       let answerText = result.answer;
       if (
@@ -90,6 +100,15 @@ export default function AIContinuityPage() {
       ]);
     } finally {
       setAsking(false);
+    }
+  };
+
+  const handleProjectChange = (newProjectId: string) => {
+    if (newProjectId !== selectedProjectId) {
+      setSelectedProjectId(newProjectId);
+      setChatLog([]);
+      setSummary(null);
+      setSummaryError(null);
     }
   };
 
@@ -249,7 +268,7 @@ export default function AIContinuityPage() {
           <select
             className="input max-w-md bg-surface-800"
             value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
+            onChange={(e) => handleProjectChange(e.target.value)}
             disabled={loadingProjects || loadingSummary}
           >
             {projects.length === 0 && <option value="">No projects available</option>}

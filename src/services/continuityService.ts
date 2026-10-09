@@ -61,13 +61,24 @@ export async function generateContinuitySummary(projectId: string, token: string
   );
 }
 
-export async function askContinuityQuestion(projectId: string, question: string, token: string): Promise<{ answer: string }> {
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function askContinuityQuestion(
+  projectId: string, 
+  question: string, 
+  token: string,
+  messages?: ChatMessage[]
+): Promise<{ answer: string }> {
   return request<{ answer: string }>(
     `/api/v1/projects/${projectId}/continuity/ask`,
     {
       method: "POST",
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, messages }),
     },
     token
   );
 }
+
