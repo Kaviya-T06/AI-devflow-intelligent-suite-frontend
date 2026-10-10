@@ -1,7 +1,6 @@
 /**
- * PMTeamTasksPage — Team task management for Project Manager role.
- * Shows all tasks across managed projects with full CRUD.
- * Developers own status transitions; PM manages assignments, priority, dates.
+ * PMSmartAllocationPage — Smart Allocation for Project Manager role.
+ * Shows unassigned tasks and recommends developers.
  */
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -569,7 +568,7 @@ function RecommendationsModal({
 
 const REFRESH_INTERVAL_MS = 30_000;
 
-export default function PMTeamTasksPage() {
+export default function PMSmartAllocationPage() {
   const [searchParams] = useSearchParams();
   const projectIdParam = searchParams.get("project");
 
@@ -625,14 +624,13 @@ export default function PMTeamTasksPage() {
 
   const projects = stats?.projects.map((p) => ({ id: p.id, name: p.name })) ?? [];
 
-  // Apply filters
   const filteredTasks = tasks.filter((t) => {
-    const statusMatch = statusFilter === "ALL" || t.status === statusFilter;
+    // Only show unassigned tasks
+    if (t.developer_name && t.assigned_to) return false;
     const searchMatch =
       !searchQuery ||
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.developer_name ?? "").toLowerCase().includes(searchQuery.toLowerCase());
-    return statusMatch && searchMatch;
+      t.title.toLowerCase().includes(searchQuery.toLowerCase());
+    return searchMatch;
   });
 
   const STATUS_TABS: { label: string; value: StatusFilter }[] = [
@@ -661,9 +659,9 @@ export default function PMTeamTasksPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-surface-50">Team Tasks</h2>
+          <h2 className="text-2xl font-bold text-surface-50">Smart Allocation</h2>
           <p className="text-surface-400 text-sm mt-1">
-            Manage and monitor tasks across your projects. Developers update task status.
+            Assign developers to tasks intelligently based on AI recommendations.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -721,28 +719,11 @@ export default function PMTeamTasksPage() {
             </svg>
             <input
               type="text"
-              placeholder="Search tasks or developers…"
+              placeholder="Search tasks…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-surface-800 border border-surface-700/50 rounded-lg pl-10 pr-4 py-2 text-surface-200 text-sm focus:outline-none focus:border-primary-500/50 placeholder:text-surface-600"
             />
-          </div>
-
-          {/* Status tabs */}
-          <div className="flex items-center gap-1 bg-surface-800/50 rounded-lg p-1 border border-surface-700/30 flex-wrap">
-            {STATUS_TABS.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setStatusFilter(tab.value)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                  statusFilter === tab.value
-                    ? "bg-primary-600 text-white"
-                    : "text-surface-400 hover:text-surface-200"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
           </div>
         </div>
       )}
@@ -812,12 +793,13 @@ export default function PMTeamTasksPage() {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => setRecommendingTask(task)}
-                                className="text-primary-400 hover:text-primary-300 transition-colors bg-primary-500/10 p-1.5 rounded"
+                                className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-500 text-white font-medium text-xs px-3 py-1.5 rounded transition-colors"
                                 title="AI Developer Recommendation"
                               >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
+                                Smart Allocate
                               </button>
                               <button
                                 onClick={() => setEditingTask(task)}

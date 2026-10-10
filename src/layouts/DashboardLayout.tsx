@@ -254,6 +254,14 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: <TeamTasksIcon />,
   },
   {
+    id: "pm-smart-allocation",
+    label: "Smart Allocation",
+    path: "/dashboard/pm-smart-allocation",
+    available: true,
+    roles: ["MANAGER"],
+    icon: <UsersIcon />,
+  },
+  {
     id: "pm-activity",
     label: "Project Activity",
     path: "/dashboard/pm-activity",

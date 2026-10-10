@@ -121,6 +121,8 @@ export async function createManagedTask(data: {
   project_id?: string | null;
   assigned_to?: string | null;
   due_date?: string | null;
+  required_skills?: string[];
+  min_experience_years?: number;
 }): Promise<Task> {
   return apiFetch<Task>("/tasks", {
     method: "POST",
@@ -141,6 +143,8 @@ export async function updateManagedTask(
     project_id?: string | null;
     assigned_to?: string | null;
     due_date?: string | null;
+    required_skills?: string[];
+    min_experience_years?: number;
   }
 ): Promise<Task> {
   return apiFetch<Task>(`/tasks/${taskId}`, {
@@ -210,5 +214,65 @@ export async function fetchMyRisks(): Promise<WorkflowRisk[]> {
 
 export async function fetchProjectHistory(projectId: string): Promise<ActivityLog[]> {
   return apiFetch<ActivityLog[]>(`/projects/${projectId}/history`);
+}
+
+// ---------------------------------------------------------------------------
+// Developer Recommendations
+// ---------------------------------------------------------------------------
+
+export interface TaskRecommendation {
+  developer_id: string;
+  developer_name: string;
+  match_score: number;
+  score_breakdown: Record<string, number>;
+  matched_skills: string[];
+  missing_skills: string[];
+  experience_relevance: string;
+  workload_warning: string | null;
+  explanation: string;
+}
+
+/** Normalize the raw backend candidate object into the frontend TaskRecommendation shape */
+function normalizeRecommendation(raw: any): TaskRecommendation {
+  const dev = raw.developer ?? {};
+  const requiredSkills: string[] = raw.task_required_skills ?? [];
+  const devSkillNames: string[] = (dev.skills ?? []).map((s: any) =>
+    (s.name ?? "").toLowerCase()
+  );
+  const missing: string[] = raw.missing_skills ?? requiredSkills.filter(
+    (s) => !devSkillNames.includes(s.toLowerCase())
+  );
+  const matched: string[] = requiredSkills.filter(
+    (s) => !missing.map((m) => m.toLowerCase()).includes(s.toLowerCase())
+  );
+
+  const rawScore: number = raw.match_score ?? 0;
+  // Backend returns score as 0-100 integer; normalize to 0-1 for percentage display
+  const matchScore = rawScore > 1 ? rawScore / 100 : rawScore;
+
+  const expYears: number = dev.experience_years ?? 0;
+  const activeTasks: number = dev.active_task_count ?? 0;
+  const capacity: number = dev.capacity_hours_per_week ?? 40;
+  const utilization = (activeTasks * 10) / Math.max(capacity, 1);
+
+  return {
+    developer_id: dev.id ?? raw.developer_id ?? "",
+    developer_name: dev.full_name ?? dev.name ?? raw.developer_name ?? "Unknown",
+    match_score: matchScore,
+    score_breakdown: raw.score_breakdown ?? {},
+    matched_skills: matched,
+    missing_skills: missing,
+    experience_relevance: `${expYears} year${expYears !== 1 ? "s" : ""} of experience`,
+    workload_warning:
+      utilization > 0.8
+        ? `High workload: ${activeTasks} active task${activeTasks !== 1 ? "s" : ""} (${Math.round(utilization * 100)}% capacity)`
+        : null,
+    explanation: raw.ai_explanation ?? raw.basic_explanation ?? "",
+  };
+}
+
+export async function fetchTaskRecommendations(taskId: string): Promise<TaskRecommendation[]> {
+  const raw = await apiFetch<any[]>(`/tasks/${taskId}/recommendations`);
+  return (raw ?? []).map(normalizeRecommendation);
 }
 

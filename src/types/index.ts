@@ -18,6 +18,11 @@ export interface Profile {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  skills?: { name: string; level: string }[];
+  experience_years?: number;
+  capacity_hours_per_week?: number;
+  preferred_role?: string | null;
+  relevant_experience?: { title: string; company: string; years: number }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +116,8 @@ export interface Task {
   review_started_at: string | null;
   completed_at: string | null;
   updated_at: string;
+  required_skills?: string[];
+  min_experience_years?: number;
   // Joined fields from backend flat response
   project_name?: string | null;
   developer_name?: string | null;

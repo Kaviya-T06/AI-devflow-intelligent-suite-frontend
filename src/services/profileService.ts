@@ -24,16 +24,21 @@ export function normalizeRole(roleStr?: string): UserRole {
   return "DEVELOPER";
 }
 
-function userRecordToProfile(user: UserRecord | { id: string; name: string; email: string; role: string; is_active?: boolean; created_at?: string | null }): Profile {
+function userRecordToProfile(user: any): Profile {
   return {
     id: user.id,
-    full_name: user.name,
+    full_name: user.name || user.full_name,
     email: user.email,
     role: normalizeRole(user.role),
-    avatar_url: null,
+    avatar_url: user.avatar_url || null,
     is_active: user.is_active ?? true,
     created_at: user.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    updated_at: user.updated_at || new Date().toISOString(),
+    skills: user.skills || [],
+    experience_years: user.experience_years || 0,
+    capacity_hours_per_week: user.capacity_hours_per_week || 40,
+    preferred_role: user.preferred_role || null,
+    relevant_experience: user.relevant_experience || [],
   };
 }
 
@@ -79,7 +84,7 @@ export async function fetchProfile(_userId?: string): Promise<Profile | null> {
 
 export async function updateProfile(
   _userId: string,
-  updates: Partial<Pick<Profile, "full_name" | "avatar_url">>
+  updates: Partial<Profile>
 ): Promise<Profile> {
   const token = localStorage.getItem("access_token");
   if (!token) throw new Error("Not authenticated");
@@ -91,7 +96,12 @@ export async function updateProfile(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      name: updates.full_name,
+      full_name: updates.full_name,
+      skills: updates.skills,
+      experience_years: updates.experience_years,
+      capacity_hours_per_week: updates.capacity_hours_per_week,
+      preferred_role: updates.preferred_role,
+      relevant_experience: updates.relevant_experience,
     }),
   });
 
