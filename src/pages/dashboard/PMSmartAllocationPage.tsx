@@ -624,14 +624,26 @@ export default function PMSmartAllocationPage() {
 
   const projects = stats?.projects.map((p) => ({ id: p.id, name: p.name })) ?? [];
 
+  // "Eligible" = not yet assigned (assigned_to is null/undefined).
+  // Use assigned_to as the sole source of truth; developer_name may lag on fresh tasks.
+  // Apply statusFilter when not "ALL", then apply search.
   const filteredTasks = tasks.filter((t) => {
-    // Only show unassigned tasks
-    if (t.developer_name && t.assigned_to) return false;
+    // Exclude tasks that are already assigned
+    if (t.assigned_to) return false;
+    // Status filter
+    if (statusFilter !== "ALL" && t.status !== statusFilter) return false;
+    // Search
     const searchMatch =
       !searchQuery ||
-      t.title.toLowerCase().includes(searchQuery.toLowerCase());
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.required_skills ?? []).some((s) =>
+        s.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     return searchMatch;
   });
+
+  // Counts for tab badges
+  const unassignedTasks = tasks.filter((t) => !t.assigned_to);
 
   const STATUS_TABS: { label: string; value: StatusFilter }[] = [
     { label: "All", value: "ALL" },
@@ -712,19 +724,45 @@ export default function PMSmartAllocationPage() {
             ))}
           </select>
 
-          {/* Search */}
+          {/* Search (also matches required skills) */}
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
               type="text"
-              placeholder="Search tasks…"
+              placeholder="Search tasks or skills…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-surface-800 border border-surface-700/50 rounded-lg pl-10 pr-4 py-2 text-surface-200 text-sm focus:outline-none focus:border-primary-500/50 placeholder:text-surface-600"
             />
           </div>
+        </div>
+      )}
+
+      {/* Status filter tabs — now actually wired to filteredTasks */}
+      {!error && (
+        <div className="flex gap-1 flex-wrap">
+          {STATUS_TABS.map((tab) => {
+            const count =
+              tab.value === "ALL"
+                ? unassignedTasks.length
+                : unassignedTasks.filter((t) => t.status === tab.value).length;
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setStatusFilter(tab.value)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  statusFilter === tab.value
+                    ? "bg-primary-600 text-white"
+                    : "bg-surface-800 text-surface-400 hover:bg-surface-700 hover:text-surface-200"
+                }`}
+              >
+                {tab.label}
+                <span className="ml-1.5 opacity-70">({count})</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -734,12 +772,36 @@ export default function PMSmartAllocationPage() {
           {filteredTasks.length === 0 ? (
             <div className="glass-card p-12 text-center">
               <span className="text-5xl mb-4 block">📋</span>
-              <p className="text-surface-300 font-semibold text-lg">No tasks found</p>
-              <p className="text-surface-500 text-sm mt-2">
-                {tasks.length === 0
-                  ? "Create your first task to get started."
-                  : "No tasks match the current filters."}
-              </p>
+              {tasks.length === 0 ? (
+                <>
+                  <p className="text-surface-300 font-semibold text-lg">No tasks yet</p>
+                  <p className="text-surface-500 text-sm mt-2">
+                    Create a task here or in <strong>Team Tasks</strong> — it will appear here automatically once it has no assignee.
+                  </p>
+                </>
+              ) : unassignedTasks.length === 0 ? (
+                <>
+                  <p className="text-surface-300 font-semibold text-lg">All tasks are already assigned</p>
+                  <p className="text-surface-500 text-sm mt-2">
+                    Every task in this project has a developer. Create a new task or remove an assignee from <strong>Team Tasks</strong> to use Smart Allocation.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-surface-300 font-semibold text-lg">No tasks match the current filters</p>
+                  <p className="text-surface-500 text-sm mt-2">
+                    {unassignedTasks.length} unassigned task{unassignedTasks.length !== 1 ? "s" : ""} exist — try a different status tab or clear the search.
+                  </p>
+                  {(statusFilter !== "ALL" || searchQuery) && (
+                    <button
+                      onClick={() => { setStatusFilter("ALL"); setSearchQuery(""); }}
+                      className="mt-3 text-primary-400 hover:text-primary-300 text-xs underline"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <div className="glass-card overflow-hidden">
@@ -747,7 +809,7 @@ export default function PMSmartAllocationPage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-surface-700/30">
-                      {["Task", "Project", "Assignee", "Priority", "Status", "Due Date", "Actions"].map((h) => (
+                      {["Task", "Project", "Required Skills", "Min Exp", "Priority", "Status", "Due Date", "Actions"].map((h) => (
                         <th key={h} className="px-4 py-3 text-surface-500 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                           {h}
                         </th>
@@ -757,6 +819,7 @@ export default function PMSmartAllocationPage() {
                   <tbody>
                     {filteredTasks.map((task) => {
                       const overdue = isOverdue(task);
+                      const hasSkills = (task.required_skills ?? []).length > 0;
                       return (
                         <tr
                           key={task.id}
@@ -771,8 +834,33 @@ export default function PMSmartAllocationPage() {
                           <td className="px-4 py-3 text-surface-400 text-sm whitespace-nowrap">
                             {task.project_name ?? "—"}
                           </td>
+                          <td className="px-4 py-3 max-w-[180px]">
+                            {hasSkills ? (
+                              <div className="flex flex-wrap gap-1">
+                                {(task.required_skills ?? []).slice(0, 3).map((s) => (
+                                  <span key={s} className="px-1.5 py-0.5 bg-primary-500/10 text-primary-300 rounded text-xs border border-primary-500/20">
+                                    {s}
+                                  </span>
+                                ))}
+                                {(task.required_skills ?? []).length > 3 && (
+                                  <span className="text-surface-500 text-xs">
+                                    +{(task.required_skills ?? []).length - 3} more
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span
+                                className="text-surface-600 text-xs italic"
+                                title="No skill requirements — any developer is eligible. Add skills via Edit to get better recommendations."
+                              >
+                                Any (add via Edit)
+                              </span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-surface-400 text-sm whitespace-nowrap">
-                            {task.developer_name ?? <span className="text-surface-600 italic">Unassigned</span>}
+                            {(task.min_experience_years ?? 0) > 0
+                              ? `${task.min_experience_years}y`
+                              : <span className="text-surface-600 text-xs">—</span>}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className={`badge text-xs px-2 py-0.5 rounded-full font-medium ${getPriorityBadgeClass(task.priority)}`}>
@@ -828,7 +916,7 @@ export default function PMSmartAllocationPage() {
                 </table>
               </div>
               <div className="px-4 py-2 border-t border-surface-700/20 text-surface-600 text-xs">
-                Showing {filteredTasks.length} of {tasks.length} tasks
+                Showing {filteredTasks.length} unassigned task{filteredTasks.length !== 1 ? "s" : ""} of {tasks.length} total
               </div>
             </div>
           )}
