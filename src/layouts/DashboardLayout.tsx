@@ -262,6 +262,14 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: <UsersIcon />,
   },
   {
+    id: "pm-what-if-simulator",
+    label: "What-If Simulator",
+    path: "/dashboard/pm-what-if-simulator",
+    available: true,
+    roles: ["MANAGER"],
+    icon: <AnalyticsIcon />,
+  },
+  {
     id: "pm-activity",
     label: "Project Activity",
     path: "/dashboard/pm-activity",

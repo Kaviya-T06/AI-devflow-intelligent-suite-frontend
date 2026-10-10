@@ -32,6 +32,7 @@ import PMActivityPage from "./pages/dashboard/PMActivityPage";
 import PMGitHubIntegrationPage from "./pages/dashboard/PMGitHubIntegrationPage";
 import PMWorkflowRisksPage from "./pages/dashboard/PMWorkflowRisksPage";
 import PMSmartAllocationPage from "./pages/dashboard/PMSmartAllocationPage";
+import PMWhatIfSimulatorPage from "./pages/dashboard/PMWhatIfSimulatorPage";
 // Developer pages
 import DeveloperWorkflowRisksPage from "./pages/dashboard/DeveloperWorkflowRisksPage";
 import AIContinuityPage from "./pages/dashboard/AIContinuityPage";
@@ -105,6 +106,10 @@ export default function App() {
                 <Route
                   path="/dashboard/pm-smart-allocation"
                   element={<PMSmartAllocationPage />}
+                />
+                <Route
+                  path="/dashboard/pm-what-if-simulator"
+                  element={<PMWhatIfSimulatorPage />}
                 />
               </Route>
 

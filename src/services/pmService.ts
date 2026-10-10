@@ -273,3 +273,73 @@ export async function fetchTaskRecommendations(taskId: string): Promise<TaskReco
   return (raw ?? []).map(normalizeRecommendation);
 }
 
+// ---------------------------------------------------------------------------
+// What-If Simulator
+// ---------------------------------------------------------------------------
+
+export interface SimulationBaseline {
+  current_deadline: string | null;
+  remaining_tasks: number;
+  remaining_estimated_effort_hours: number | null;
+  available_capacity_hours: number | null;
+}
+
+export interface DeadlineSimulationScenario {
+  proposed_deadline: string;
+  remaining_tasks: number;
+  remaining_estimated_effort_hours: number | null;
+  available_capacity_hours: number | null;
+  capacity_gap_hours: number | null;
+  schedule_concerns: string[];
+}
+
+export interface UnavailabilitySimulationScenario {
+  developer_id: string;
+  start_date: string;
+  end_date: string;
+  capacity_removed_hours: number;
+  remaining_tasks: number;
+  remaining_estimated_effort_hours: number | null;
+  available_capacity_hours: number | null;
+  capacity_gap_hours: number | null;
+  affected_tasks: Task[];
+  replacements: any[];
+  schedule_concerns: string[];
+}
+
+export interface DeadlineSimulationResponse {
+  baseline: SimulationBaseline;
+  scenario: DeadlineSimulationScenario;
+  assumptions_and_limitations: string[];
+  is_simulation: boolean;
+  ai_explanation?: string;
+}
+
+export interface UnavailabilitySimulationResponse {
+  baseline: SimulationBaseline;
+  scenario: UnavailabilitySimulationScenario;
+  assumptions_and_limitations: string[];
+  is_simulation: boolean;
+  ai_explanation?: string;
+}
+
+/**
+ * Simulate a project deadline change
+ */
+export async function simulateDeadlineChange(projectId: string, proposedDeadline: string): Promise<DeadlineSimulationResponse> {
+  return apiFetch<DeadlineSimulationResponse>(`/projects/${projectId}/simulate-deadline`, {
+    method: "POST",
+    body: JSON.stringify({ proposed_deadline: proposedDeadline }),
+  });
+}
+
+/**
+ * Simulate developer unavailability
+ */
+export async function simulateDeveloperUnavailability(projectId: string, payload: { developer_id: string; start_date: string; end_date: string; }): Promise<UnavailabilitySimulationResponse> {
+  return apiFetch<UnavailabilitySimulationResponse>(`/projects/${projectId}/simulate-unavailability`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
