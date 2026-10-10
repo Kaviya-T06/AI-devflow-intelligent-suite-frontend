@@ -51,6 +51,7 @@ export default function App() {
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/dashboard/profile" element={<ProfilePage />} />
+              <Route path="/dashboard/notifications" element={<NotificationsPage />} />
 
               {/* Developer-only modules */}
               <Route
@@ -66,10 +67,6 @@ export default function App() {
                 <Route
                   path="/dashboard/my-activity"
                   element={<MyActivityPage />}
-                />
-                <Route
-                  path="/dashboard/notifications"
-                  element={<NotificationsPage />}
                 />
                 <Route
                   path="/dashboard/ai-continuity"

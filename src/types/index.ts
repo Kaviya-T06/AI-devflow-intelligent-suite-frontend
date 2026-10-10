@@ -257,3 +257,35 @@ export interface PMActivityItem {
   user_id: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+export type NotificationType =
+  | "TASK_ASSIGNED"
+  | "TASK_STATUS_CHANGED"
+  | "TASK_OVERDUE"
+  | "RISK_ALERT"
+  | "SMART_ALLOCATION"
+  | "GITHUB_EVENT"
+  | "PM_UPDATE";
+
+export interface Notification {
+  id: string;
+  recipient_id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  project_id: string | null;
+  task_id: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  items: Notification[];
+  unread_count: number;
+  total: number;
+}
+
+

@@ -1,9 +1,10 @@
 /**
  * DashboardLayout — persistent sidebar + top header shell for all dashboard pages.
  */
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { fetchUnreadCount } from "../services/notificationService";
 import type { UserRole } from "../types";
 
 interface NavItem {
@@ -187,6 +188,22 @@ const TeamTasksIcon = () => (
   </svg>
 );
 
+const BellIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.8}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+    />
+  </svg>
+);
+
 const ALL_NAV_ITEMS: NavItem[] = [
   {
     id: "dashboard",
@@ -194,6 +211,14 @@ const ALL_NAV_ITEMS: NavItem[] = [
     path: "/dashboard",
     available: true,
     icon: <DashboardIcon />,
+  },
+  {
+    id: "notifications",
+    label: "Notifications",
+    path: "/dashboard/notifications",
+    available: true,
+    roles: ["ADMIN", "MANAGER", "DEVELOPER", "TEAM_MEMBER"],
+    icon: <BellIcon />,
   },
   // Developer-only nav items
   {
@@ -224,14 +249,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     id: "my-risks",
     label: "My Workflow",
     path: "/dashboard/my-risks",
-    available: true,
-    roles: ["DEVELOPER"],
-    icon: <WorkflowRisksIcon />,
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    path: "/dashboard/notifications",
     available: true,
     roles: ["DEVELOPER"],
     icon: <WorkflowRisksIcon />,
@@ -433,6 +450,26 @@ function Sidebar({
         .slice(0, 2)
     : (displayEmail[0] ?? "A").toUpperCase();
 
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadUnread = async () => {
+      try {
+        const count = await fetchUnreadCount();
+        if (isMounted) setUnreadCount(count);
+      } catch (err) {
+        // Silent fallback
+      }
+    };
+    loadUnread();
+    const interval = setInterval(loadUnread, 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   // Filter nav items based on role
   const navItems = ALL_NAV_ITEMS.filter((item) => {
     if (!item.roles) return true; // available to all
@@ -514,6 +551,11 @@ function Sidebar({
                 >
                   {item.icon}
                   <span>{item.label}</span>
+                  {item.id === "notifications" && unreadCount > 0 && (
+                    <span className="ml-auto bg-primary-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                      {unreadCount}
+                    </span>
+                  )}
                 </NavLink>
               );
             }
