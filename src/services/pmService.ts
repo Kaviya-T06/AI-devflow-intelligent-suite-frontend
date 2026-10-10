@@ -235,13 +235,10 @@ export interface TaskRecommendation {
 /** Normalize the raw backend candidate object into the frontend TaskRecommendation shape */
 function normalizeRecommendation(raw: any): TaskRecommendation {
   const dev = raw.developer ?? {};
+  
+  // Rely on backend's fields for skills
   const requiredSkills: string[] = raw.task_required_skills ?? [];
-  const devSkillNames: string[] = (dev.skills ?? []).map((s: any) =>
-    (s.name ?? "").toLowerCase()
-  );
-  const missing: string[] = raw.missing_skills ?? requiredSkills.filter(
-    (s) => !devSkillNames.includes(s.toLowerCase())
-  );
+  const missing: string[] = raw.missing_skills ?? [];
   const matched: string[] = requiredSkills.filter(
     (s) => !missing.map((m) => m.toLowerCase()).includes(s.toLowerCase())
   );
