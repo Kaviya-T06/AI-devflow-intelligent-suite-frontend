@@ -194,7 +194,7 @@ export default function ProfilePage() {
                       value={skill.name}
                       onChange={(e) => {
                         const newSkills = [...skills];
-                        newSkills[i].name = e.target.value;
+                        newSkills[i] = { ...newSkills[i], name: e.target.value };
                         setSkills(newSkills);
                       }}
                       className="input-field flex-1"
@@ -204,7 +204,7 @@ export default function ProfilePage() {
                       value={skill.level}
                       onChange={(e) => {
                         const newSkills = [...skills];
-                        newSkills[i].level = e.target.value;
+                        newSkills[i] = { ...newSkills[i], level: e.target.value };
                         setSkills(newSkills);
                       }}
                       className="input-field w-32"
