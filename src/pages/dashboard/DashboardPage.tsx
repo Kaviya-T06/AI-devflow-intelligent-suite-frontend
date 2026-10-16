@@ -3,10 +3,8 @@
  */
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import ComingSoonModule from "../../components/dashboard/ComingSoonModule";
 import DeveloperDashboard from "../../components/dashboard/DeveloperDashboard";
 import ProjectManagerDashboard from "../../components/dashboard/ProjectManagerDashboard";
-import { checkBackendHealth } from "../../services/apiService";
 import { fetchDashboardStats, fetchRecentActivity } from "../../services/adminService";
 import type { UserRole } from "../../types";
 import type { DashboardStats, } from "../../services/adminService";
@@ -39,41 +37,7 @@ const ROLE_CONFIG: Record<UserRole, { title: string; subtitle: string; color: st
   },
 };
 
-const StatusDot = ({ ok }: { ok: boolean | null }) => {
-  if (ok === null) return <div className="w-2 h-2 rounded-full bg-warning-400 animate-pulse" />;
-  return <div className={`w-2 h-2 rounded-full ${ok ? "bg-success-400" : "bg-danger-400"}`} />;
-};
 
-const MODULE_PLACEHOLDERS = [
-  {
-    title: "Bottleneck Detection",
-    description: "Automatically detect workflow impediments, stale PRs, blocked tickets, and team dependencies.",
-    milestone: "Milestone 3",
-    icon: (<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>),
-    accentColor: "text-warning-400",
-  },
-  {
-    title: "Team Activity",
-    description: "Track individual and team contributions, code review activity, and collaboration patterns.",
-    milestone: "Milestone 2",
-    icon: (<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>),
-    accentColor: "text-primary-400",
-  },
-  {
-    title: "AI Insights",
-    description: "AI-generated recommendations to improve team performance, reduce cycle time, and prevent burnout.",
-    milestone: "Milestone 4",
-    icon: (<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>),
-    accentColor: "text-yellow-400",
-  },
-  {
-    title: "Project History",
-    description: "Maintain institutional memory with searchable project timelines, decisions, and retrospective data.",
-    milestone: "Milestone 3",
-    icon: (<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
-    accentColor: "text-surface-400",
-  },
-];
 
 // Admin stat card
 function StatCard({ label, value, icon, color }: { label: string; value: number | null; icon: string; color: string }) {
@@ -103,14 +67,9 @@ export default function DashboardPage() {
   const isManager = role === "MANAGER";
   const showStats = isAdmin; // Only Admin sees the full platform stats here; Manager has its own dashboard component
 
-  const [backendStatus, setBackendStatus] = useState<boolean | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
-
-  useEffect(() => {
-    checkBackendHealth().then(() => setBackendStatus(true)).catch(() => setBackendStatus(false));
-  }, []);
 
   useEffect(() => {
     if (showStats) {
@@ -129,28 +88,13 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Welcome header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-surface-50">
-            {greeting}, {profile?.full_name?.split(" ")[0] || "there"} 👋
-          </h2>
-          <p className="text-surface-400 mt-1 text-sm">
-            {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="glass-card px-4 py-2.5 flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <StatusDot ok={true} />
-              <span className="text-xs text-surface-400">Supabase</span>
-            </div>
-            <div className="w-px h-4 bg-surface-700" />
-            <div className="flex items-center gap-1.5">
-              <StatusDot ok={backendStatus} />
-              <span className="text-xs text-surface-400">Backend API</span>
-            </div>
-          </div>
-        </div>
+      <div>
+        <h2 className="text-2xl font-bold text-surface-50">
+          {greeting}, {profile?.full_name?.split(" ")[0] || "there"} 👋
+        </h2>
+        <p className="text-surface-400 mt-1 text-sm">
+          {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+        </p>
       </div>
 
       {/* Role card */}
@@ -289,20 +233,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Upcoming modules (show for admin only — manager has dedicated PM pages) */}
-      {showStats && isAdmin && (
-        <div>
-        <div className="flex items-center gap-3 mb-6">
-          <h3 className="section-title">Platform Modules</h3>
-          <span className="badge bg-surface-700/50 text-surface-400 border border-surface-600/40">Modules unlock progressively</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {MODULE_PLACEHOLDERS.map((mod) => (
-            <ComingSoonModule key={mod.title} {...mod} />
-          ))}
-        </div>
-        </div>
-      )}
+
     </div>
   );
 }

@@ -26,7 +26,7 @@ export default function LoadingScreen() {
         <div className="absolute inset-0 rounded-2xl border-2 border-primary-500/40 animate-ping" />
       </div>
 
-      <p className="gradient-text font-bold text-lg tracking-wide">AI DevFlow</p>
+      <p className="gradient-text font-bold text-lg tracking-wide">AI DevFlow Intelligence Suite</p>
       <p className="text-surface-500 text-sm mt-1">Initializing workspace…</p>
 
       {/* Dot loader */}

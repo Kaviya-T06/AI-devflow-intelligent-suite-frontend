@@ -61,7 +61,7 @@ export interface NavItem {
   label: string;
   path: string;
   icon: string;
-  available: boolean; // false = shows "coming in next milestone"
+  available: boolean; // false = shows "coming soon"
   roles?: UserRole[]; // if set, only these roles see this item
 }
 
@@ -118,6 +118,8 @@ export interface Task {
   updated_at: string;
   required_skills?: string[];
   min_experience_years?: number;
+  estimated_hours?: number | null;
+  estimated_effort?: number | null;
   // Joined fields from backend flat response
   project_name?: string | null;
   developer_name?: string | null;
@@ -200,6 +202,17 @@ export interface DeveloperWorkload {
   overdue_tasks: number;
 }
 
+export interface HealthScoreComponent {
+  reason: string;
+  amount: number;
+}
+
+export interface ProjectHealth {
+  score: number;
+  components: HealthScoreComponent[];
+  data_completeness: string;
+}
+
 export interface ProjectSummary {
   id: string;
   name: string;
@@ -215,6 +228,7 @@ export interface ProjectSummary {
   todo_tasks: number;
   overdue_tasks: number;
   developers: DeveloperWorkload[];
+  health?: ProjectHealth;
 }
 
 export interface OverdueTaskSummary {
@@ -258,12 +272,142 @@ export interface PMActivityItem {
 }
 
 // ---------------------------------------------------------------------------
+// Project Pulse Phase 4 AI Recommendations
+// ---------------------------------------------------------------------------
+
+export interface SupportingReference {
+  type: string;
+  id: string;
+  label: string;
+}
+
+export interface PulseRecommendation {
+  id: string;
+  category: string;
+  title: string;
+  explanation: string;
+  why_it_matters: string;
+  missing_info_or_assumptions: string;
+  confidence: "High" | "Medium" | "Low";
+  confidence_rationale: string;
+  supporting_references: SupportingReference[];
+  actionable_entity_id?: string | null;
+  actionable_entity_type?: string | null;
+}
+
+export interface PulseRecommendationsResponse {
+  project_id: string;
+  project_name: string;
+  health_score: number;
+  health_data_completeness: string;
+  recommendations: PulseRecommendation[];
+  source: "gemini" | "deterministic";
+  ai_status: "SUCCESS" | "FALLBACK" | "OFFLINE";
+  ai_notice?: string | null;
+  generated_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Project Pulse Phase 5 AI Briefing
+// ---------------------------------------------------------------------------
+
+export interface HealthSection {
+  score: number;
+  status: string;
+  data_completeness: string;
+  factors: string[];
+  explanation: string;
+}
+
+export interface CompletedWorkSection {
+  tasks_count: number;
+  task_titles: string[];
+  summary: string;
+}
+
+export interface InProgressAndPendingSection {
+  in_progress_count: number;
+  todo_count: number;
+  in_progress_tasks: string[];
+  pending_tasks: string[];
+  summary: string;
+}
+
+export interface OverdueOrBlockedSection {
+  count: number;
+  items: string[];
+  summary: string;
+}
+
+export interface UnresolvedRisksSection {
+  critical_count: number;
+  high_count: number;
+  items: string[];
+  summary: string;
+}
+
+export interface RecentActivitySection {
+  items: string[];
+  summary: string;
+}
+
+export interface GitHubContextSection {
+  is_configured: boolean;
+  repository?: string | null;
+  recent_commits_count: number;
+  open_prs_count: number;
+  branches_count: number;
+  summary: string;
+}
+
+export interface RecommendedNextActionsSection {
+  actions: string[];
+  summary: string;
+}
+
+export interface DataGapsSection {
+  gaps: string[];
+  reliability_impact: string;
+}
+
+export interface PulseBriefingSections {
+  health: HealthSection;
+  completed_work: CompletedWorkSection;
+  in_progress_and_pending: InProgressAndPendingSection;
+  overdue_or_blocked: OverdueOrBlockedSection;
+  unresolved_risks: UnresolvedRisksSection;
+  recent_activity: RecentActivitySection;
+  github_context: GitHubContextSection;
+  recommended_next_actions: RecommendedNextActionsSection;
+  data_gaps: DataGapsSection;
+}
+
+export interface PulseBriefingResponse {
+  project_id: string;
+  project_name: string;
+  generated_at: string;
+  data_freshness: string;
+  health_score: number;
+  health_data_completeness: string;
+  sections: PulseBriefingSections;
+  verified_facts: Record<string, any>;
+  source: "gemini" | "deterministic";
+  ai_status: "SUCCESS" | "FALLBACK" | "OFFLINE";
+  ai_notice?: string | null;
+}
+
+
+
+// ---------------------------------------------------------------------------
 // Notifications
 // ---------------------------------------------------------------------------
 
 export type NotificationType =
+  | "PROJECT_ASSIGNED"
   | "TASK_ASSIGNED"
   | "TASK_STATUS_CHANGED"
+  | "TASK_REVIEW_REQUESTED"
+  | "TASK_COMPLETED"
   | "TASK_OVERDUE"
   | "RISK_ALERT"
   | "SMART_ALLOCATION"

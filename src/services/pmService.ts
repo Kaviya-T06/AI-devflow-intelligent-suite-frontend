@@ -9,6 +9,8 @@ import type {
   Task,
   Project,
   ActivityLog,
+  PulseRecommendationsResponse,
+  PulseBriefingResponse,
 } from "../types";
 
 const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -56,8 +58,9 @@ export async function fetchPMDashboardStats(): Promise<PMDashboardStats> {
 /**
  * Fetch recent activity for the PM's managed projects.
  */
-export async function fetchPMActivity(limit = 20): Promise<PMActivityItem[]> {
-  return apiFetch<PMActivityItem[]>(`/dashboard/pm-activity?limit=${limit}`);
+export async function fetchPMActivity(limit = 60, projectId?: string): Promise<PMActivityItem[]> {
+  const qs = projectId ? `?limit=${limit}&project_id=${projectId}` : `?limit=${limit}`;
+  return apiFetch<PMActivityItem[]>(`/dashboard/pm-activity${qs}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +126,8 @@ export async function createManagedTask(data: {
   due_date?: string | null;
   required_skills?: string[];
   min_experience_years?: number;
+  estimated_hours?: number | null;
+  estimated_effort?: number | null;
 }): Promise<Task> {
   return apiFetch<Task>("/tasks", {
     method: "POST",
@@ -145,6 +150,8 @@ export async function updateManagedTask(
     due_date?: string | null;
     required_skills?: string[];
     min_experience_years?: number;
+    estimated_hours?: number | null;
+    estimated_effort?: number | null;
   }
 ): Promise<Task> {
   return apiFetch<Task>(`/tasks/${taskId}`, {
@@ -277,11 +284,54 @@ export async function fetchTaskRecommendations(taskId: string): Promise<TaskReco
 // What-If Simulator
 // ---------------------------------------------------------------------------
 
+export interface DeveloperCapacityInfo {
+  developer_id: string;
+  name: string;
+  email?: string | null;
+  capacity_hours_per_week?: number | null;
+  has_capacity: boolean;
+  assigned_tasks_count: number;
+}
+
+export interface SimulatorTaskItem {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  due_date?: string | null;
+  assigned_to?: string | null;
+  assigned_to_name?: string | null;
+  estimated_hours?: number | null;
+  estimated_effort?: number | null;
+  has_estimate: boolean;
+}
+
+export interface ProjectSimulatorData {
+  project_id: string;
+  project_name: string;
+  current_deadline?: string | null;
+  total_remaining_tasks: number;
+  tasks_with_estimates: number;
+  tasks_missing_estimates: number;
+  total_estimated_effort_hours: number;
+  developers_with_capacity: number;
+  developers_missing_capacity: number;
+  sufficient_data_for_simulation: boolean;
+  tasks: SimulatorTaskItem[];
+  developers: DeveloperCapacityInfo[];
+}
+
 export interface SimulationBaseline {
   current_deadline: string | null;
   remaining_tasks: number;
   remaining_estimated_effort_hours: number | null;
   available_capacity_hours: number | null;
+  working_days?: number;
+  working_weeks?: number;
+  tasks_with_estimates?: number;
+  tasks_missing_estimates?: number;
+  developers_with_capacity?: number;
+  developers_missing_capacity?: number;
 }
 
 export interface DeadlineSimulationScenario {
@@ -290,7 +340,15 @@ export interface DeadlineSimulationScenario {
   remaining_estimated_effort_hours: number | null;
   available_capacity_hours: number | null;
   capacity_gap_hours: number | null;
+  capacity_gap_status?: "calculated" | "partial" | "unavailable";
+  working_days?: number;
+  working_weeks?: number;
+  tasks_with_estimates?: number;
+  tasks_missing_estimates?: number;
+  developers_with_capacity?: number;
+  developers_missing_capacity?: number;
   schedule_concerns: string[];
+  missing_data_items?: string[];
 }
 
 export interface UnavailabilitySimulationScenario {
@@ -302,9 +360,17 @@ export interface UnavailabilitySimulationScenario {
   remaining_estimated_effort_hours: number | null;
   available_capacity_hours: number | null;
   capacity_gap_hours: number | null;
+  capacity_gap_status?: "calculated" | "partial" | "unavailable";
+  working_days?: number;
+  working_weeks?: number;
+  tasks_with_estimates?: number;
+  tasks_missing_estimates?: number;
+  developers_with_capacity?: number;
+  developers_missing_capacity?: number;
   affected_tasks: Task[];
   replacements: any[];
   schedule_concerns: string[];
+  missing_data_items?: string[];
 }
 
 export interface DeadlineSimulationResponse {
@@ -321,6 +387,47 @@ export interface UnavailabilitySimulationResponse {
   assumptions_and_limitations: string[];
   is_simulation: boolean;
   ai_explanation?: string;
+}
+
+/**
+ * Fetch comprehensive simulator data for a project (tasks, estimates, developer capacities)
+ */
+export async function fetchSimulatorData(projectId: string): Promise<ProjectSimulatorData> {
+  return apiFetch<ProjectSimulatorData>(`/projects/${projectId}/simulator-data`);
+}
+
+/**
+ * Update task estimated hours
+ */
+export async function updateTaskEstimate(
+  projectId: string,
+  taskId: string,
+  estimatedHours: number
+): Promise<{ task_id: string; estimated_hours: number; message: string }> {
+  return apiFetch<{ task_id: string; estimated_hours: number; message: string }>(
+    `/projects/${projectId}/tasks/${taskId}/estimate`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ estimated_hours: estimatedHours }),
+    }
+  );
+}
+
+/**
+ * Update developer weekly capacity hours
+ */
+export async function updateDeveloperCapacity(
+  projectId: string,
+  developerId: string,
+  capacityHoursPerWeek: number
+): Promise<DeveloperCapacityInfo> {
+  return apiFetch<DeveloperCapacityInfo>(
+    `/projects/${projectId}/developers/${developerId}/capacity`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ capacity_hours_per_week: capacityHoursPerWeek }),
+    }
+  );
 }
 
 /**
@@ -342,4 +449,21 @@ export async function simulateDeveloperUnavailability(projectId: string, payload
     body: JSON.stringify(payload),
   });
 }
+
+/**
+ * Fetch Phase 4 AI-grounded recovery recommendations for Project Pulse
+ */
+export async function fetchPulseRecommendations(projectId: string): Promise<PulseRecommendationsResponse> {
+  return apiFetch<PulseRecommendationsResponse>(`/dashboard/projects/${projectId}/pulse-recommendations`);
+}
+
+/**
+ * Fetch Phase 5 AI-grounded executive briefing for Project Pulse
+ */
+export async function fetchPulseBriefing(projectId: string): Promise<PulseBriefingResponse> {
+  return apiFetch<PulseBriefingResponse>(`/dashboard/projects/${projectId}/pulse-briefing`);
+}
+
+
+
 

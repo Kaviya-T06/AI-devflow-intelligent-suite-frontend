@@ -53,22 +53,8 @@ export default function AIContinuityPage() {
       const result = await generateContinuitySummary(selectedProjectId, token);
       setSummary(result);
     } catch (err: any) {
-      setSummaryError(err.message || "Failed to generate summary");
-      if (err.raw_context) {
-        setSummary({
-          project_overview: "Provider Error: " + err.message,
-          previous_developer_work: "AI analysis could not be completed. Review the 'Project History' tab manually.",
-          current_work: "Cannot retrieve AI insights at this time. Refer to the raw project tasks below.",
-          pending_work: "Check the 'Tasks' dashboard directly to see pending work.",
-          blocked_overdue_work: "Check the 'Workflow Risks' dashboard for any active blockers.",
-          recent_github_activity: "Refer to the GitHub integration module for raw commits and PRs.",
-          known_issues: `Provider Error: ${err.message}`,
-          important_context: "The backend successfully gathered your project context, but the final AI summarization step failed.",
-          what_next_developer_should_know: "You can still perform all project operations, browse tasks, and view history manually.",
-          recommended_next_steps: "Check backend logs for the exact error. Verify AI_API_KEY and AI_MODEL in .env, then try again.",
-          raw_context: err.raw_context
-        } as ContinuitySummary);
-      }
+      setSummaryError(err.message || "Failed to generate project summary");
+      setSummary(null);
     } finally {
       setLoadingSummary(false);
     }
@@ -269,10 +255,10 @@ export default function AIContinuityPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-surface-50 flex items-center gap-2">
-            <span className="text-2xl">🚀</span> Developer Handover
+            <span className="text-2xl">✨</span> AI Project Summary & Continuity
           </h2>
           <p className="text-surface-400 text-sm mt-1">
-            Instant, verified project continuity powered by AI and real development data.
+            Generate project-specific summaries explaining purpose, scope, and verified development records.
           </p>
         </div>
       </div>
@@ -301,23 +287,31 @@ export default function AIContinuityPage() {
             {loadingSummary ? (
               <span className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                Analyzing Project...
+                Generating Summary...
               </span>
             ) : (
-              "Generate AI Handover"
+              "Generate Summary"
             )}
           </button>
         </div>
-        {summaryError && <p className="text-danger-400 text-sm mt-3">{summaryError}</p>}
+        {summaryError && (
+          <div className="p-4 bg-danger-500/10 border border-danger-500/20 rounded-xl mt-3 text-danger-300 text-sm flex items-center gap-3">
+            <span className="text-lg">⚠️</span>
+            <div>
+              <p className="font-semibold text-danger-200">Summary Generation Failed</p>
+              <p className="text-xs text-danger-300/80 mt-0.5">{summaryError}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {loadingSummary && (
         <div className="glass-card p-12 flex flex-col items-center justify-center space-y-6 border border-primary-500/20 bg-primary-900/5">
           <div className="w-12 h-12 border-4 border-primary-500/30 border-t-primary-500 rounded-full animate-spin"></div>
           <div className="text-center">
-            <p className="text-primary-100 font-medium text-lg">Synthesizing Project Handover...</p>
+            <p className="text-primary-100 font-medium text-lg">Generating Project AI Summary...</p>
             <p className="text-primary-300/60 text-sm mt-1">
-              Connecting GitHub commits, active tasks, and risk indicators.
+              Analyzing project scope, purpose, tasks, and development records.
             </p>
           </div>
         </div>
@@ -363,7 +357,7 @@ export default function AIContinuityPage() {
 
           <div className="glass-card p-6 border-l-4 border-l-primary-500 bg-primary-900/10">
             <h3 className="text-sm font-bold text-primary-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-              <span className="text-lg">✨</span> AI Handover Summary
+              <span className="text-lg">✨</span> AI Summary
             </h3>
             {isAiUnavailable ? (
               <div className="bg-warning-900/20 border border-warning-500/30 p-4 rounded-lg mt-3">

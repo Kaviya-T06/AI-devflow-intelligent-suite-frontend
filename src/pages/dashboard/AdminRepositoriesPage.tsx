@@ -10,6 +10,7 @@ import {
   fetchAllProjects,
 } from "../../services/adminService";
 import type { Repository, RepoProvider, Project } from "../../types";
+import Modal from "../../components/ui/Modal";
 
 const PROVIDERS: RepoProvider[] = ["GitHub", "GitLab", "Bitbucket"];
 
@@ -75,14 +76,13 @@ function RepoModal({ initial, onSave, onClose, projects }: ModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fade-in">
-      <div className="glass-card w-full max-w-lg p-6 space-y-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-surface-50">{initial?.id ? "Edit Repository" : "Add Repository"}</h3>
-          <button onClick={onClose} className="btn-ghost p-1" id="repo-modal-close">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={initial?.id ? "Edit Repository" : "Add Repository"}
+      maxWidthClass="max-w-lg"
+    >
+      <div className="space-y-4">
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -134,7 +134,7 @@ function RepoModal({ initial, onSave, onClose, projects }: ModalProps) {
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -143,8 +143,13 @@ function RepoModal({ initial, onSave, onClose, projects }: ModalProps) {
 // ---------------------------------------------------------------------------
 function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: () => void; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fade-in">
-      <div className="glass-card w-full max-w-sm p-6 space-y-4 text-center">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Remove Repository"
+      maxWidthClass="max-w-sm"
+    >
+      <div className="space-y-4 text-center">
         <div className="w-12 h-12 rounded-full bg-danger-500/15 flex items-center justify-center mx-auto">
           <svg className="w-6 h-6 text-danger-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
         </div>
@@ -157,7 +162,7 @@ function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: (
           <button onClick={onClose}   className="btn-secondary flex-1" id="repo-cancel-delete">Cancel</button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

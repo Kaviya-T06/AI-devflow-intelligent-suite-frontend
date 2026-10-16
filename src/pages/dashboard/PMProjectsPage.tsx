@@ -121,7 +121,13 @@ function ProjectCard({
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <h3 className="text-surface-100 font-semibold text-base truncate">{project.name}</h3>
+          <h3
+            onClick={() => navigate(`/dashboard/projects/${project.id}`)}
+            className="text-surface-100 font-semibold text-base truncate cursor-pointer hover:text-primary-400 transition-colors"
+            title="View project details"
+          >
+            {project.name}
+          </h3>
           {project.description && (
             <p className="text-surface-400 text-xs mt-1 line-clamp-2">{project.description}</p>
           )}
@@ -239,20 +245,28 @@ function ProjectCard({
         </div>
       )}
 
-      {/* View Tasks & History link */}
-      <div className="pt-2 border-t border-surface-700/30 flex justify-between">
+      {/* View Tasks, Project Details & History link */}
+      <div className="pt-2 border-t border-surface-700/30 flex items-center justify-between text-xs">
         <button
-          onClick={() => navigate(`/dashboard/pm-team-tasks?project=${project.id}`)}
-          className="text-primary-400 text-xs hover:text-primary-300 hover:underline transition-colors"
+          onClick={() => navigate(`/dashboard/projects/${project.id}`)}
+          className="text-emerald-400 hover:text-emerald-300 font-medium hover:underline transition-colors"
         >
-          View Tasks →
+          Project Details →
         </button>
-        <button
-          onClick={() => onViewHistory(project)}
-          className="text-accent-400 text-xs hover:text-accent-300 hover:underline transition-colors"
-        >
-          View History →
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => navigate(`/dashboard/pm-team-tasks?project=${project.id}`)}
+            className="text-primary-400 text-xs hover:text-primary-300 hover:underline transition-colors"
+          >
+            Tasks →
+          </button>
+          <button
+            onClick={() => onViewHistory(project)}
+            className="text-accent-400 text-xs hover:text-accent-300 hover:underline transition-colors"
+          >
+            History →
+          </button>
+        </div>
       </div>
     </div>
   );

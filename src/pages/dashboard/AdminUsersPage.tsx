@@ -13,6 +13,7 @@ import {
   type UserRecord,
 } from "../../services/adminService";
 import { useAuth } from "../../context/AuthContext";
+import Modal from "../../components/ui/Modal";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -109,19 +110,13 @@ function UserModal({ mode, initial, onSave, onClose }: ModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fade-in">
-      <div className="glass-card w-full max-w-md p-6 space-y-5 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-surface-50">
-            {mode === "add" ? "Add User" : "Edit User"}
-          </h3>
-          <button onClick={onClose} className="btn-ghost p-1" id="user-modal-close">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={mode === "add" ? "Add User" : "Edit User"}
+      maxWidthClass="max-w-md"
+    >
+      <div className="space-y-4">
 
         {errors._global && (
           <div className="glass-card p-3 border-danger-500/30 bg-danger-500/10">
@@ -205,7 +200,7 @@ function UserModal({ mode, initial, onSave, onClose }: ModalProps) {
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -223,8 +218,13 @@ function ConfirmDeleteModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fade-in">
-      <div className="glass-card w-full max-w-sm p-6 space-y-4 text-center">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Delete User"
+      maxWidthClass="max-w-sm"
+    >
+      <div className="space-y-4 text-center">
         <div className="w-12 h-12 rounded-full bg-danger-500/15 flex items-center justify-center mx-auto">
           <svg className="w-6 h-6 text-danger-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -242,7 +242,7 @@ function ConfirmDeleteModal({
           <button onClick={onClose}   className="btn-secondary flex-1" id="user-cancel-delete">Cancel</button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

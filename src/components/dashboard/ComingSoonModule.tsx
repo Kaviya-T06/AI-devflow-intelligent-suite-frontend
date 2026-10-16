@@ -6,7 +6,6 @@ import type { ReactNode } from "react";
 interface ComingSoonModuleProps {
   title: string;
   description: string;
-  milestone?: string;
   icon?: ReactNode;
   accentColor?: string;
 }
@@ -20,7 +19,6 @@ const DefaultIcon = () => (
 export default function ComingSoonModule({
   title,
   description,
-  milestone = "Milestone 2",
   icon,
   accentColor = "text-primary-400",
 }: ComingSoonModuleProps) {
@@ -36,7 +34,7 @@ export default function ComingSoonModule({
       <div className="flex items-center gap-2 px-4 py-2 bg-surface-700/50 rounded-full border border-surface-600/40">
         <div className="w-1.5 h-1.5 rounded-full bg-warning-400 animate-pulse" />
         <span className="text-xs text-surface-400 font-medium">
-          Available in {milestone}
+          Coming Soon
         </span>
       </div>
     </div>

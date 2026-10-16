@@ -18,6 +18,7 @@ import {
   type TaskRecommendation,
 } from "../../services/pmService";
 import type { Task, PMDashboardStats } from "../../types";
+import Modal from "../../components/ui/Modal";
 
 // ---------------------------------------------------------------------------
 // Types & Helpers
@@ -163,18 +164,12 @@ function TaskModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="glass-card w-full max-w-lg p-6 animate-fade-in">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-surface-50 font-bold text-lg">
-            {mode === "create" ? "Create Task" : "Edit Task"}
-          </h3>
-          <button onClick={onClose} className="text-surface-400 hover:text-surface-200 transition-colors">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={mode === "create" ? "Create Task" : "Edit Task"}
+      maxWidthClass="max-w-lg"
+    >
 
         {success && (
           <div className="bg-success-500/10 border border-success-500/20 text-success-300 p-3 rounded-lg mb-4 text-sm flex items-center gap-2">
@@ -332,8 +327,7 @@ function TaskModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -366,9 +360,13 @@ function DeleteConfirm({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="glass-card w-full max-w-sm p-6 animate-fade-in">
-        <h3 className="text-surface-50 font-bold text-lg mb-2">Delete Task?</h3>
+    <Modal
+      isOpen
+      onClose={onCancel}
+      title="Delete Task?"
+      maxWidthClass="max-w-sm"
+    >
+      <div className="p-2 space-y-4">
         <p className="text-surface-400 text-sm mb-4">
           Are you sure you want to delete <strong className="text-surface-200">"{task.title}"</strong>? This cannot be undone.
         </p>
@@ -389,7 +387,7 @@ function DeleteConfirm({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -439,21 +437,14 @@ function RecommendationsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="glass-card w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 animate-fade-in flex flex-col">
-        <div className="flex items-center justify-between mb-5 shrink-0">
-          <div>
-            <h3 className="text-surface-50 font-bold text-xl">AI Recommendations</h3>
-            <p className="text-surface-400 text-sm mt-1">
-              For task: <span className="text-surface-200 font-medium">{task.title}</span>
-            </p>
-          </div>
-          <button onClick={onClose} className="text-surface-400 hover:text-surface-200 transition-colors">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="AI Recommendations"
+      subtitle={`For task: ${task.title}`}
+      maxWidthClass="max-w-4xl"
+    >
+      <div className="flex flex-col space-y-4">
 
         {error && (
           <div className="bg-danger-500/10 border border-danger-500/20 text-danger-400 p-3 rounded-lg mb-4 text-sm flex items-center gap-2 shrink-0">
@@ -559,7 +550,7 @@ function RecommendationsModal({
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -610,6 +601,15 @@ export default function PMTeamTasksPage() {
     if (!recommendingTask) return;
     await updateManagedTask(recommendingTask.id, { assigned_to: developerId });
     await loadData();
+  };
+
+  const handleReviewAction = async (taskId: string, newStatus: string) => {
+    try {
+      await updateManagedTask(taskId, { status: newStatus });
+      await loadData();
+    } catch (err) {
+      alert("Error updating task: " + (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   useEffect(() => {
@@ -767,7 +767,7 @@ export default function PMTeamTasksPage() {
                   <thead>
                     <tr className="border-b border-surface-700/30">
                       {["Task", "Project", "Assignee", "Priority", "Status", "Due Date", "Actions"].map((h) => (
-                        <th key={h} className="px-4 py-3 text-surface-500 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
+                        <th key={h} className="px-4 py-2.5 text-surface-500 text-xs font-semibold uppercase tracking-wider whitespace-nowrap">
                           {h}
                         </th>
                       ))}
@@ -781,35 +781,53 @@ export default function PMTeamTasksPage() {
                           key={task.id}
                           className="border-b border-surface-700/20 hover:bg-surface-800/40 transition-colors"
                         >
-                          <td className="px-4 py-3 max-w-[200px]">
-                            <p className="text-surface-200 text-sm font-medium truncate">{task.title}</p>
+                          <td className="px-4 py-2.5 max-w-xs">
+                            <p className="text-surface-200 text-sm font-medium truncate" title={task.title}>{task.title}</p>
                             {task.description && (
-                              <p className="text-surface-500 text-xs truncate">{task.description}</p>
+                              <p className="text-surface-500 text-xs truncate" title={task.description}>{task.description}</p>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-surface-400 text-sm whitespace-nowrap">
+                          <td className="px-4 py-2.5 text-surface-400 text-sm whitespace-nowrap">
                             {task.project_name ?? "—"}
                           </td>
-                          <td className="px-4 py-3 text-surface-400 text-sm whitespace-nowrap">
+                          <td className="px-4 py-2.5 text-surface-400 text-sm whitespace-nowrap">
                             {task.developer_name ?? <span className="text-surface-600 italic">Unassigned</span>}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
                             <span className={`badge text-xs px-2 py-0.5 rounded-full font-medium ${getPriorityBadgeClass(task.priority)}`}>
                               {task.priority}
                             </span>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
                             <span className={`badge text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadgeClass(task.status)}`}>
                               {task.status.replace("_", " ")}
                             </span>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
                             <span className={overdue ? "text-danger-400 text-xs font-medium" : "text-surface-400 text-sm"}>
                               {overdue ? "⚠️ " : ""}{formatDate(task.due_date)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
                             <div className="flex items-center gap-2">
+                              {task.status === "REVIEW" && (
+                                <>
+                                  <button
+                                    onClick={() => handleReviewAction(task.id, "COMPLETED")}
+                                    className="text-success-300 hover:text-success-200 bg-success-500/15 hover:bg-success-500/25 border border-success-500/30 px-2 py-1 rounded text-xs font-medium transition-colors"
+                                    title="Approve task completion"
+                                  >
+                                    ✓ Approve
+                                  </button>
+                                  <button
+                                    onClick={() => handleReviewAction(task.id, "IN_PROGRESS")}
+                                    className="text-warning-300 hover:text-warning-200 bg-warning-500/15 hover:bg-warning-500/25 border border-warning-500/30 px-2 py-1 rounded text-xs font-medium transition-colors"
+                                    title="Request revisions (move back to In Progress)"
+                                  >
+                                    ↩ Revisions
+                                  </button>
+                                </>
+                              )}
                               <button
                                 onClick={() => setRecommendingTask(task)}
                                 className="text-primary-400 hover:text-primary-300 transition-colors bg-primary-500/10 p-1.5 rounded"

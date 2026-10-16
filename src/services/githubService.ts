@@ -64,9 +64,42 @@ export interface GitHubIssue {
   url: string;
 }
 
+export interface LinkedDeveloperDetails {
+  id: string;
+  name: string;
+  email?: string | null;
+  task_id?: string | null;
+  task_title?: string | null;
+}
+
 export interface GitHubBranch {
   name: string;
   last_commit_sha: string;
+  last_commit_message?: string | null;
+  last_commit_author?: string | null;
+  last_commit_date?: string | null;
+  associated_pull_request?: number | null;
+  linked_developer?: LinkedDeveloperDetails | string | null;
+  creator?: string | null;
+}
+
+export interface BranchAssignableDeveloper {
+  id: string;
+  name: string;
+  email?: string | null;
+  role?: string | null;
+  tasks: { id: string; title: string; status: string }[];
+}
+
+export interface TaskGitHubContext {
+  task_id: string;
+  project_id: string;
+  repository_name?: string | null;
+  repository_url?: string | null;
+  associated_branch?: string | null;
+  associated_pull_request_number?: number | null;
+  associated_pull_request_url?: string | null;
+  available_branches: string[];
 }
 
 export async function getProjectRepository(
@@ -129,3 +162,84 @@ export async function getIssues(projectId: string): Promise<GitHubIssue[]> {
 export async function getBranches(projectId: string): Promise<GitHubBranch[]> {
   return apiFetch<GitHubBranch[]>(`/projects/${projectId}/branches`);
 }
+
+export async function createProjectBranch(
+  projectId: string,
+  data: {
+    branch_name: string;
+    base_branch?: string;
+    task_id?: string;
+  },
+): Promise<GitHubBranch> {
+  return apiFetch<GitHubBranch>(`/projects/${projectId}/branches`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function associateTaskBranch(
+  taskId: string,
+  branchName: string,
+): Promise<{ message: string; branch_name: string }> {
+  return apiFetch<{ message: string; branch_name: string }>(`/tasks/${taskId}/branch`, {
+    method: "POST",
+    body: JSON.stringify({ branch_name: branchName }),
+  });
+}
+
+export async function associateTaskPullRequest(
+  taskId: string,
+  data: {
+    pull_request_number?: number;
+    pull_request_url: string;
+  },
+): Promise<{ message: string; pull_request_number?: number; pull_request_url: string }> {
+  return apiFetch<{ message: string; pull_request_number?: number; pull_request_url: string }>(
+    `/tasks/${taskId}/pull-request`,
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    },
+  );
+}
+
+export async function getTaskGitHubContext(
+  taskId: string,
+): Promise<TaskGitHubContext> {
+  return apiFetch<TaskGitHubContext>(`/tasks/${taskId}/github-context`);
+}
+
+export async function fetchProjectAssignableDevelopers(
+  projectId: string
+): Promise<BranchAssignableDeveloper[]> {
+  return apiFetch<BranchAssignableDeveloper[]>(
+    `/projects/${projectId}/assignable-developers`
+  );
+}
+
+export async function assignBranchDeveloper(
+  projectId: string,
+  branchName: string,
+  data: { developer_id: string; task_id?: string | null }
+): Promise<{ message: string; branch_name: string; developer_id: string; developer_name?: string }> {
+  return apiFetch<{ message: string; branch_name: string; developer_id: string; developer_name?: string }>(
+    `/projects/${projectId}/branches/${encodeURIComponent(branchName)}/assign`,
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    }
+  );
+}
+
+export async function unassignBranchDeveloper(
+  projectId: string,
+  branchName: string
+): Promise<{ message: string; branch_name: string }> {
+  return apiFetch<{ message: string; branch_name: string }>(
+    `/projects/${projectId}/branches/${encodeURIComponent(branchName)}/assign`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+

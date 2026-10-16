@@ -17,6 +17,7 @@ import {
   type TaskRecommendation,
 } from "../../services/pmService";
 import type { Task, PMDashboardStats } from "../../types";
+import Modal from "../../components/ui/Modal";
 
 // ---------------------------------------------------------------------------
 // Types & Helpers
@@ -162,18 +163,12 @@ function TaskModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="glass-card w-full max-w-lg p-6 animate-fade-in">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-surface-50 font-bold text-lg">
-            {mode === "create" ? "Create Task" : "Edit Task"}
-          </h3>
-          <button onClick={onClose} className="text-surface-400 hover:text-surface-200 transition-colors">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={mode === "create" ? "Create Task" : "Edit Task"}
+      maxWidthClass="max-w-lg"
+    >
 
         {success && (
           <div className="bg-success-500/10 border border-success-500/20 text-success-300 p-3 rounded-lg mb-4 text-sm flex items-center gap-2">
@@ -331,8 +326,7 @@ function TaskModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -365,9 +359,13 @@ function DeleteConfirm({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="glass-card w-full max-w-sm p-6 animate-fade-in">
-        <h3 className="text-surface-50 font-bold text-lg mb-2">Delete Task?</h3>
+    <Modal
+      isOpen
+      onClose={onCancel}
+      title="Delete Task?"
+      maxWidthClass="max-w-sm"
+    >
+      <div className="p-2 space-y-4">
         <p className="text-surface-400 text-sm mb-4">
           Are you sure you want to delete <strong className="text-surface-200">"{task.title}"</strong>? This cannot be undone.
         </p>
@@ -388,7 +386,7 @@ function DeleteConfirm({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -438,21 +436,14 @@ function RecommendationsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="glass-card w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 animate-fade-in flex flex-col">
-        <div className="flex items-center justify-between mb-5 shrink-0">
-          <div>
-            <h3 className="text-surface-50 font-bold text-xl">AI Recommendations</h3>
-            <p className="text-surface-400 text-sm mt-1">
-              For task: <span className="text-surface-200 font-medium">{task.title}</span>
-            </p>
-          </div>
-          <button onClick={onClose} className="text-surface-400 hover:text-surface-200 transition-colors">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="AI Recommendations"
+      subtitle={`For task: ${task.title}`}
+      maxWidthClass="max-w-4xl"
+    >
+      <div className="flex flex-col space-y-4">
 
         {error && (
           <div className="bg-danger-500/10 border border-danger-500/20 text-danger-400 p-3 rounded-lg mb-4 text-sm flex items-center gap-2 shrink-0">
@@ -558,7 +549,7 @@ function RecommendationsModal({
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }
 

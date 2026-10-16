@@ -1,7 +1,7 @@
 /**
  * Login page — allows existing users to sign in.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { loginUser } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
@@ -30,7 +30,7 @@ const EyeIcon = ({ open }: { open: boolean }) =>
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { refreshAuth } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading, refreshAuth } = useAuth();
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/dashboard";
 
   const [form, setForm] = useState({ email: "", password: "" });
@@ -38,6 +38,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // If already authenticated, redirect to dashboard
+  useEffect(() => {
+    if (isAuthenticated && !isAuthLoading) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, isAuthLoading, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -63,7 +70,8 @@ export default function LoginPage() {
     try {
       await loginUser({ email: form.email.trim(), password: form.password });
       refreshAuth();
-      navigate(from, { replace: true });
+      const target = from && from !== "/login" && from !== "/" ? from : "/dashboard";
+      navigate(target, { replace: true });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Login failed";
       setError(
@@ -77,7 +85,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       {/* ── Left decorative panel ── */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-primary-900 via-surface-900 to-surface-950 items-center justify-center p-16">
         {/* Glow blobs */}
@@ -87,14 +95,15 @@ export default function LoginPage() {
         <div className="relative z-10 max-w-md">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-glow">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-glow shrink-0">
               <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
             <div>
-              <p className="text-white font-bold text-lg leading-none">AI DevFlow</p>
-              <p className="text-surface-400 text-xs mt-0.5">Intelligence Suite</p>
+              <p className="gradient-text font-bold text-base leading-tight">
+                AI DevFlow Intelligence Suite
+              </p>
             </div>
           </div>
 
@@ -123,11 +132,11 @@ export default function LoginPage() {
       </div>
 
       {/* ── Right form panel ── */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-md animate-fade-in">
+      <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
+        <div className="w-full max-w-md animate-fade-in py-4">
           {/* Mobile logo */}
-          <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
+          <div className="flex items-center gap-3 mb-5 lg:hidden">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shrink-0">
               <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
@@ -137,8 +146,8 @@ export default function LoginPage() {
 
           {!selectedRole ? (
             <>
-              <h1 className="text-2xl font-bold text-surface-50 mb-1">Sign in to your workspace</h1>
-              <p className="text-surface-400 text-sm mb-8">Choose your role to continue.</p>
+              <h1 className="text-xl font-bold text-surface-50 mb-1">Sign in to your workspace</h1>
+              <p className="text-surface-400 text-sm mb-5">Choose your role to continue.</p>
               <div className="grid grid-cols-1 gap-3">
                 {ROLES.map((role) => (
                   <button
@@ -157,6 +166,11 @@ export default function LoginPage() {
                   </button>
                 ))}
               </div>
+              <div className="mt-5 text-center">
+                <span className="gradient-text font-bold text-xs tracking-wide">
+                  AI DevFlow Intelligence Suite
+                </span>
+              </div>
             </>
           ) : (
             <>
@@ -172,8 +186,8 @@ export default function LoginPage() {
                   Change role
                 </button>
               </div>
-              <h1 className="text-2xl font-bold text-surface-50 mb-1">Sign in to your workspace</h1>
-              <p className="text-surface-400 text-sm mb-8">
+              <h1 className="text-xl font-bold text-surface-50 mb-1">Sign in to your workspace</h1>
+              <p className="text-surface-400 text-sm mb-5">
                 Don't have an account?{" "}
                 <Link
                   to="/register"
@@ -256,9 +270,11 @@ export default function LoginPage() {
               )}
             </button>
               </form>
-              <p className="text-center text-surface-600 text-xs mt-8">
-                AI DevFlow Intelligence Suite · Milestone 1
-              </p>
+              <div className="mt-8 text-center">
+                <span className="gradient-text font-bold text-xs tracking-wide">
+                  AI DevFlow Intelligence Suite
+                </span>
+              </div>
             </>
           )}
         </div>

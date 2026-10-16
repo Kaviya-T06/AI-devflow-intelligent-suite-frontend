@@ -188,6 +188,20 @@ const TeamTasksIcon = () => (
   </svg>
 );
 
+const GitHubIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.184 6.839 9.504.5.092.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844a9.59 9.59 0 012.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0022 12.021C22 6.484 17.522 2 12 2z"
+    />
+  </svg>
+);
+
 const BellIcon = () => (
   <svg
     className="w-5 h-5"
@@ -255,6 +269,14 @@ const ALL_NAV_ITEMS: NavItem[] = [
   },
   // Manager-only nav items
   {
+    id: "pm-project-pulse",
+    label: "Project Pulse",
+    path: "/dashboard/pm-project-pulse",
+    available: true,
+    roles: ["MANAGER"],
+    icon: <AnalyticsIcon />,
+  },
+  {
     id: "pm-projects",
     label: "My Projects",
     path: "/dashboard/pm-projects",
@@ -279,22 +301,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: <UsersIcon />,
   },
   {
-    id: "pm-what-if-simulator",
-    label: "What-If Simulator",
-    path: "/dashboard/pm-what-if-simulator",
-    available: true,
-    roles: ["MANAGER"],
-    icon: <AnalyticsIcon />,
-  },
-  {
-    id: "pm-activity",
-    label: "Project Activity",
-    path: "/dashboard/pm-activity",
-    available: true,
-    roles: ["MANAGER"],
-    icon: <ActivityIcon />,
-  },
-  {
     id: "pm-workflow-risks",
     label: "Workflow Risks",
     path: "/dashboard/pm-workflow-risks",
@@ -303,20 +309,20 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: <WorkflowRisksIcon />,
   },
   {
-    id: "pm-github",
-    label: "GitHub Integration",
-    path: "/dashboard/github-integration",
-    available: true,
-    roles: ["MANAGER"],
-    icon: <RepositoriesIcon />,
-  },
-  {
     id: "pm-ai-continuity",
     label: "AI Continuity",
     path: "/dashboard/pm-ai-continuity",
     available: true,
     roles: ["MANAGER", "ADMIN"],
     icon: <AIIcon />,
+  },
+  {
+    id: "pm-github-integration",
+    label: "GitHub Integration",
+    path: "/dashboard/github-integration",
+    available: true,
+    roles: ["MANAGER"],
+    icon: <GitHubIcon />,
   },
   {
     id: "dev-ai-continuity",
@@ -416,10 +422,12 @@ function Sidebar({
   isOpen,
   onClose,
   role,
+  unreadCount,
 }: {
   isOpen: boolean;
   onClose: () => void;
   role: UserRole;
+  unreadCount: number;
 }) {
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -450,26 +458,6 @@ function Sidebar({
         .slice(0, 2)
     : (displayEmail[0] ?? "A").toUpperCase();
 
-  const [unreadCount, setUnreadCount] = useState<number>(0);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadUnread = async () => {
-      try {
-        const count = await fetchUnreadCount();
-        if (isMounted) setUnreadCount(count);
-      } catch (err) {
-        // Silent fallback
-      }
-    };
-    loadUnread();
-    const interval = setInterval(loadUnread, 10000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
   // Filter nav items based on role
   const navItems = ALL_NAV_ITEMS.filter((item) => {
     if (!item.roles) return true; // available to all
@@ -487,14 +475,14 @@ function Sidebar({
 
       <aside
         className={[
-          "fixed top-0 left-0 h-full w-64 z-30 flex flex-col",
+          "fixed top-0 left-0 h-full w-60 z-30 flex flex-col",
           "bg-surface-900 border-r border-surface-700/50",
           "transition-transform duration-300 ease-in-out",
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         ].join(" ")}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-surface-700/50">
+        <div className="flex items-center gap-3 px-4 py-4 border-b border-surface-700/50">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-glow shrink-0">
             <svg
               className="w-5 h-5 text-white"
@@ -511,17 +499,14 @@ function Sidebar({
             </svg>
           </div>
           <div className="min-w-0">
-            <p className="gradient-text font-bold text-sm leading-none">
-              AI DevFlow
-            </p>
-            <p className="text-surface-500 text-xs mt-0.5 truncate">
-              Intelligence Suite
+            <p className="gradient-text font-bold text-sm leading-tight">
+              AI DevFlow Intelligence Suite
             </p>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
+        <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5">
           {isAdmin && (
             <p className="text-surface-600 text-xs font-semibold uppercase tracking-wider px-2 mb-2">
               Admin
@@ -563,7 +548,7 @@ function Sidebar({
               <div
                 key={item.id}
                 className="nav-item opacity-40 cursor-not-allowed"
-                title="Coming in next milestone"
+                title="Coming soon"
               >
                 {item.icon}
                 <span>{item.label}</span>
@@ -627,10 +612,19 @@ function Sidebar({
   );
 }
 
-function TopHeader({ onMenuClick }: { onMenuClick: () => void }) {
+function TopHeader({ onMenuClick, unreadCount }: { onMenuClick: () => void; unreadCount: number }) {
   const { profile } = useAuth();
+  const navigate = useNavigate();
+
+  const initials = profile?.full_name
+    ?.split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "?";
+
   return (
-    <header className="h-16 bg-surface-900/80 backdrop-blur-md border-b border-surface-700/50 flex items-center gap-4 px-4 lg:px-6 sticky top-0 z-10">
+    <header className="h-14 bg-surface-900/80 backdrop-blur-md border-b border-surface-700/50 flex items-center gap-4 px-4 lg:px-6 sticky top-0 z-10">
       <button
         className="lg:hidden p-2 rounded-lg text-surface-400 hover:text-surface-100 hover:bg-surface-700/50 transition-colors"
         onClick={onMenuClick}
@@ -651,25 +645,38 @@ function TopHeader({ onMenuClick }: { onMenuClick: () => void }) {
         </svg>
       </button>
       <div className="flex-1">
-        <h1 className="text-surface-100 font-semibold text-sm lg:text-base">
-          AI DevFlow{" "}
-          <span className="text-surface-500 font-normal">
-            Intelligence Suite
-          </span>
+        <h1 className="gradient-text font-bold text-sm lg:text-base tracking-wide">
+          AI DevFlow Intelligence Suite
         </h1>
       </div>
       <div className="flex items-center gap-3">
-        <span className="hidden sm:flex badge bg-primary-500/15 text-primary-300 border border-primary-500/20">
-          Milestone 5
-        </span>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-xs">
-          {profile?.full_name
-            ?.split(" ")
-            .map((n) => n[0])
-            .join("")
-            .toUpperCase()
-            .slice(0, 2) || "?"}
-        </div>
+        <button
+          id="top-header-notification-bell"
+          onClick={() => navigate("/dashboard/notifications")}
+          aria-label="View notifications"
+          title={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
+          className="relative p-2 rounded-lg text-surface-400 hover:text-surface-100 hover:bg-surface-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          {unreadCount > 0 && (
+            <span
+              id="notification-bell-badge"
+              className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-primary-500 rounded-full animate-pulse border-2 border-surface-900"
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => navigate("/dashboard/profile")}
+          aria-label="View your profile"
+          title="Your profile"
+          className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-xs hover:ring-2 hover:ring-primary-400 hover:ring-offset-2 hover:ring-offset-surface-900 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-900"
+        >
+          {initials}
+        </button>
       </div>
     </header>
   );
@@ -677,9 +684,28 @@ function TopHeader({ onMenuClick }: { onMenuClick: () => void }) {
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   const { profile } = useAuth();
   // Default to ADMIN when profile hasn't loaded yet (pre-DB: fallback profile synthesized in profileService)
   const role = (profile?.role ?? "ADMIN") as UserRole;
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadUnread = async () => {
+      try {
+        const count = await fetchUnreadCount();
+        if (isMounted) setUnreadCount(count);
+      } catch (err) {
+        // Silent fallback
+      }
+    };
+    loadUnread();
+    const interval = setInterval(loadUnread, 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen flex">
@@ -687,9 +713,10 @@ export default function DashboardLayout() {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         role={role}
+        unreadCount={unreadCount}
       />
-      <div className="flex-1 flex flex-col lg:ml-64 min-w-0">
-        <TopHeader onMenuClick={() => setSidebarOpen(true)} />
+      <div className="flex-1 flex flex-col lg:ml-60 min-w-0">
+        <TopHeader onMenuClick={() => setSidebarOpen(true)} unreadCount={unreadCount} />
         <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
           <Outlet />
         </main>

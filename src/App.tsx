@@ -27,6 +27,7 @@ import AdminSettingsPage from "./pages/dashboard/AdminSettingsPage";
 import AnalyticsPage from "./pages/dashboard/AnalyticsPage";
 // Project Manager pages
 import PMProjectsPage from "./pages/dashboard/PMProjectsPage";
+import PMProjectPulsePage from "./pages/dashboard/PMProjectPulsePage";
 import PMTeamTasksPage from "./pages/dashboard/PMTeamTasksPage";
 import PMActivityPage from "./pages/dashboard/PMActivityPage";
 import PMGitHubIntegrationPage from "./pages/dashboard/PMGitHubIntegrationPage";
@@ -36,6 +37,23 @@ import PMWhatIfSimulatorPage from "./pages/dashboard/PMWhatIfSimulatorPage";
 // Developer pages
 import DeveloperWorkflowRisksPage from "./pages/dashboard/DeveloperWorkflowRisksPage";
 import AIContinuityPage from "./pages/dashboard/AIContinuityPage";
+import ProjectDetailPage from "./pages/dashboard/ProjectDetailPage";
+import { useAuth } from "./context/AuthContext";
+import LoadingScreen from "./components/ui/LoadingScreen";
+
+function RootRoute() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Navigate to="/dashboard" replace />;
+}
 
 export default function App() {
   return (
@@ -52,6 +70,8 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/dashboard/profile" element={<ProfilePage />} />
               <Route path="/dashboard/notifications" element={<NotificationsPage />} />
+              <Route path="/dashboard/projects/:projectId" element={<ProjectDetailPage />} />
+              <Route path="/dashboard/project/:projectId" element={<ProjectDetailPage />} />
 
               {/* Developer-only modules */}
               <Route
@@ -83,6 +103,10 @@ export default function App() {
                 <Route
                   path="/dashboard/pm-projects"
                   element={<PMProjectsPage />}
+                />
+                <Route
+                  path="/dashboard/pm-project-pulse"
+                  element={<PMProjectPulsePage />}
                 />
                 <Route
                   path="/dashboard/pm-team-tasks"
@@ -160,9 +184,9 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Default redirect */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* Default routes: unauthenticated users redirect to /login; authenticated users go to /dashboard */}
+          <Route path="/" element={<RootRoute />} />
+          <Route path="*" element={<RootRoute />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

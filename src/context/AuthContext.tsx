@@ -73,6 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const serverProfile = await fetchProfile(authUser.id);
       if (serverProfile) {
         setProfile(serverProfile);
+      } else if (!localStorage.getItem("access_token")) {
+        setUser(null);
+        setToken(null);
+        setProfile(null);
       }
     } catch {
       // Keep optimistic profile if backend is temporarily unreachable

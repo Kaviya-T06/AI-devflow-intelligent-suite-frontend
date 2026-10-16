@@ -167,10 +167,36 @@ export async function logoutUser(): Promise<void> {
 // Get current session (from localStorage)
 // ---------------------------------------------------------------------------
 
+export function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return false;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    const payload = JSON.parse(jsonPayload);
+    if (payload.exp && typeof payload.exp === "number") {
+      return Date.now() >= payload.exp * 1000;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function getCurrentSession(): { token: string; user: AuthUser } | null {
   const token = getStoredToken();
   const user = getStoredUser();
   if (!token || !user) return null;
+  if (isTokenExpired(token)) {
+    clearToken();
+    return null;
+  }
   return { token, user };
 }
 

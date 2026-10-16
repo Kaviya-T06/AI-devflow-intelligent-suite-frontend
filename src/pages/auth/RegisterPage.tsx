@@ -127,8 +127,9 @@ const LeftPanel = () => (
           </svg>
         </div>
         <div>
-          <p className="text-white font-bold text-lg leading-none">AI DevFlow</p>
-          <p className="text-surface-400 text-xs mt-0.5">Intelligence Suite</p>
+          <p className="gradient-text font-bold text-base leading-tight">
+            AI DevFlow Intelligence Suite
+          </p>
         </div>
       </div>
 
@@ -169,12 +170,12 @@ function RolePickerStep({ onSelect }: { onSelect: (role: UserRole) => void }) {
   const [hovered, setHovered] = useState<UserRole | null>(null);
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       <LeftPanel />
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
-        <div className="w-full max-w-md animate-fade-in py-8">
+      <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
+        <div className="w-full max-w-md animate-fade-in py-4">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
@@ -182,7 +183,7 @@ function RolePickerStep({ onSelect }: { onSelect: (role: UserRole) => void }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <span className="gradient-text font-bold text-xl">AI DevFlow</span>
+            <span className="gradient-text font-bold text-xl">AI DevFlow Intelligence Suite</span>
           </div>
 
           <h1 className="text-2xl font-bold text-surface-50 mb-1">Create your account</h1>
@@ -246,9 +247,11 @@ function RolePickerStep({ onSelect }: { onSelect: (role: UserRole) => void }) {
             })}
           </div>
 
-          <p className="text-center text-surface-600 text-xs mt-8">
-            AI DevFlow Intelligence Suite · Milestone 1
-          </p>
+          <div className="mt-8 text-center">
+            <span className="gradient-text font-bold text-xs tracking-wide">
+              AI DevFlow Intelligence Suite
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -355,12 +358,12 @@ function SignupFormStep({
   const selectedRoleMeta = ROLES.find((r) => r.value === form.role)!;
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex overflow-hidden">
       <LeftPanel />
 
       {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
-        <div className="w-full max-w-md animate-fade-in py-8">
+      <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
+        <div className="w-full max-w-lg animate-fade-in py-4">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
@@ -368,7 +371,7 @@ function SignupFormStep({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <span className="gradient-text font-bold text-xl">AI DevFlow</span>
+            <span className="gradient-text font-bold text-xl">AI DevFlow Intelligence Suite</span>
           </div>
 
           {/* Step indicator + back */}
@@ -400,8 +403,8 @@ function SignupFormStep({
             <span className={`ml-auto ${selectedRoleMeta.badgeClass}`}>{form.role}</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-surface-50 mb-1">Create your account</h1>
-          <p className="text-surface-400 text-sm mb-8">
+          <h1 className="text-xl font-bold text-surface-50 mb-1">Create your account</h1>
+          <p className="text-surface-400 text-sm mb-4">
             Already have an account?{" "}
             <Link to="/login" className="text-primary-400 hover:text-primary-300 font-medium transition-colors">
               Sign in
@@ -410,7 +413,7 @@ function SignupFormStep({
 
           {/* Error */}
           {error && (
-            <div className="mb-6 flex items-start gap-3 bg-danger-500/10 border border-danger-500/30 rounded-lg px-4 py-3 animate-fade-in">
+            <div className="mb-4 flex items-start gap-3 bg-danger-500/10 border border-danger-500/30 rounded-lg px-4 py-2.5 animate-fade-in">
               <svg className="w-5 h-5 text-danger-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
@@ -418,37 +421,40 @@ function SignupFormStep({
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-            {/* Full name */}
-            <div>
-              <label htmlFor="reg-name" className="input-label">Full name</label>
-              <input
-                id="reg-name"
-                name="fullName"
-                type="text"
-                autoComplete="name"
-                placeholder="Jane Smith"
-                value={form.fullName}
-                onChange={handleChange}
-                className="input-field"
-                disabled={isLoading}
-              />
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>
+            {/* Two-column layout for full name + email on large screens */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Full name */}
+              <div>
+                <label htmlFor="reg-name" className="input-label">Full name</label>
+                <input
+                  id="reg-name"
+                  name="fullName"
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Jane Smith"
+                  value={form.fullName}
+                  onChange={handleChange}
+                  className="input-field"
+                  disabled={isLoading}
+                />
+              </div>
 
-            {/* Email */}
-            <div>
-              <label htmlFor="reg-email" className="input-label">Email address</label>
-              <input
-                id="reg-email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder="jane@example.com"
-                value={form.email}
-                onChange={handleChange}
-                className="input-field"
-                disabled={isLoading}
-              />
+              {/* Email */}
+              <div>
+                <label htmlFor="reg-email" className="input-label">Email address</label>
+                <input
+                  id="reg-email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="jane@example.com"
+                  value={form.email}
+                  onChange={handleChange}
+                  className="input-field"
+                  disabled={isLoading}
+                />
+              </div>
             </div>
 
             {/* Role (radio group — pre-selected, user can still change) */}
@@ -465,7 +471,7 @@ function SignupFormStep({
                   <label
                     key={value}
                     htmlFor={`reg-role-${value}`}
-                    className={`flex min-h-20 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border px-2 py-3 text-center text-sm transition-colors ${
+                    className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-center text-xs transition-colors ${
                       form.role === value
                         ? "border-primary-500 bg-primary-500/10 text-primary-300"
                         : "border-surface-700 bg-surface-800/60 text-surface-400 hover:border-surface-600"
@@ -478,7 +484,7 @@ function SignupFormStep({
                       value={value}
                       checked={form.role === value}
                       onChange={() => setForm((prev) => ({ ...prev, role: value }))}
-                      className="h-4 w-4 accent-primary-500"
+                      className="h-3.5 w-3.5 accent-primary-500"
                       disabled={isLoading}
                     />
                     <span>{label}</span>
@@ -487,60 +493,63 @@ function SignupFormStep({
               </div>
             </div>
 
-            {/* Password */}
-            <div>
-              <label htmlFor="reg-password" className="input-label">Password</label>
-              <div className="relative">
-                <input
-                  id="reg-password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  placeholder="Min. 8 chars, 1 uppercase, 1 number"
-                  value={form.password}
-                  onChange={handleChange}
-                  className="input-field pr-12"
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((p) => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-300 transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  <EyeIcon open={showPassword} />
-                </button>
+            {/* Password and Confirm password in two columns on sm+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Password */}
+              <div>
+                <label htmlFor="reg-password" className="input-label">Password</label>
+                <div className="relative">
+                  <input
+                    id="reg-password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    placeholder="Min. 8 chars, 1 uppercase, 1 num"
+                    value={form.password}
+                    onChange={handleChange}
+                    className="input-field pr-10 text-sm"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((p) => !p)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-300 transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    <EyeIcon open={showPassword} />
+                  </button>
+                </div>
+                <PasswordStrengthBar password={form.password} />
               </div>
-              <PasswordStrengthBar password={form.password} />
-            </div>
 
-            {/* Confirm password */}
-            <div>
-              <label htmlFor="reg-confirm" className="input-label">Confirm password</label>
-              <div className="relative">
-                <input
-                  id="reg-confirm"
-                  name="confirmPassword"
-                  type={showConfirm ? "text" : "password"}
-                  autoComplete="new-password"
-                  placeholder="Repeat your password"
-                  value={form.confirmPassword}
-                  onChange={handleChange}
-                  className="input-field pr-12"
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm((p) => !p)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-300 transition-colors"
-                  aria-label={showConfirm ? "Hide password" : "Show password"}
-                >
-                  <EyeIcon open={showConfirm} />
-                </button>
+              {/* Confirm password */}
+              <div>
+                <label htmlFor="reg-confirm" className="input-label">Confirm password</label>
+                <div className="relative">
+                  <input
+                    id="reg-confirm"
+                    name="confirmPassword"
+                    type={showConfirm ? "text" : "password"}
+                    autoComplete="new-password"
+                    placeholder="Repeat password"
+                    value={form.confirmPassword}
+                    onChange={handleChange}
+                    className="input-field pr-10 text-sm"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm((p) => !p)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-300 transition-colors"
+                    aria-label={showConfirm ? "Hide password" : "Show password"}
+                  >
+                    <EyeIcon open={showConfirm} />
+                  </button>
+                </div>
+                {form.confirmPassword && form.password !== form.confirmPassword && (
+                  <p className="text-xs text-danger-400 mt-1">Passwords do not match</p>
+                )}
               </div>
-              {form.confirmPassword && form.password !== form.confirmPassword && (
-                <p className="text-xs text-danger-400 mt-1">Passwords do not match</p>
-              )}
             </div>
 
             {/* Role note */}
@@ -573,9 +582,11 @@ function SignupFormStep({
             </button>
           </form>
 
-          <p className="text-center text-surface-600 text-xs mt-8">
-            AI DevFlow Intelligence Suite · Milestone 1
-          </p>
+          <div className="mt-8 text-center">
+            <span className="gradient-text font-bold text-xs tracking-wide">
+              AI DevFlow Intelligence Suite
+            </span>
+          </div>
         </div>
       </div>
     </div>

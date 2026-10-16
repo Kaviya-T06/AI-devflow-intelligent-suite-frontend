@@ -3,46 +3,38 @@
  */
 import { useLocation } from "react-router-dom";
 
-const MODULE_MAP: Record<string, { title: string; description: string; milestone: string }> = {
+const MODULE_MAP: Record<string, { title: string; description: string }> = {
   "/dashboard/projects": {
     title: "Projects",
-    description: "Create and manage development projects, link GitHub repositories, and track milestones.",
-    milestone: "Milestone 2",
+    description: "Create and manage development projects, link GitHub repositories, and track project delivery.",
   },
   "/dashboard/workflow": {
     title: "Workflow",
     description: "Visualize your team's development workflow from idea to deployment.",
-    milestone: "Milestone 2",
   },
   "/dashboard/analytics": {
     title: "Analytics",
     description: "Deep-dive metrics: sprint velocity, PR cycle time, deployment frequency, and more.",
-    milestone: "Milestone 2",
   },
   "/dashboard/bottlenecks": {
     title: "Bottleneck Detection",
     description: "AI-powered detection of workflow impediments, stale reviews, and blocked work items.",
-    milestone: "Milestone 3",
   },
   "/dashboard/team": {
     title: "Team",
     description: "Collaborate, review team contributions, and manage member roles and responsibilities.",
-    milestone: "Milestone 2",
   },
   "/dashboard/history": {
     title: "Project History",
-    description: "Searchable timeline of all project decisions, milestones, and retrospectives.",
-    milestone: "Milestone 3",
+    description: "Searchable timeline of all project decisions and retrospective data.",
   },
   "/dashboard/ai-insights": {
     title: "AI Insights",
     description: "AI-generated recommendations to optimize velocity, reduce risk, and prevent team burnout.",
-    milestone: "Milestone 4",
   },
   "/dashboard/settings": {
     title: "Settings",
     description: "Configure platform preferences, notification rules, and integration credentials.",
-    milestone: "Milestone 2",
   },
 };
 
@@ -50,8 +42,7 @@ export default function ComingSoonPage() {
   const location = useLocation();
   const info = MODULE_MAP[location.pathname] || {
     title: "This Module",
-    description: "This section is under development and will be available in a future milestone.",
-    milestone: "Next Milestone",
+    description: "This section is under development and will be available soon.",
   };
 
   return (
@@ -72,14 +63,9 @@ export default function ComingSoonPage() {
         <div className="flex items-center gap-2 px-5 py-2.5 bg-surface-700/40 rounded-full border border-surface-600/30">
           <div className="w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
           <span className="text-sm text-surface-400">
-            Module will be available in{" "}
-            <span className="text-primary-300 font-semibold">{info.milestone}</span>
+            Module will be available soon
           </span>
         </div>
-
-        <p className="text-xs text-surface-600 text-center">
-          The foundation built in Milestone 1 is architected to support this feature without rewrites.
-        </p>
       </div>
     </div>
   );

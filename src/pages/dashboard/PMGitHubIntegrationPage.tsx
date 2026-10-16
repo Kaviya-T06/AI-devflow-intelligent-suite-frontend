@@ -6,10 +6,14 @@ import {
   connectRepository,
   disconnectRepository,
   syncRepository,
+  createProjectBranch,
   getCommits,
   getPullRequests,
   getIssues,
   getBranches,
+  assignBranchDeveloper,
+  unassignBranchDeveloper,
+  fetchProjectAssignableDevelopers,
 } from "../../services/githubService";
 import type {
   GitHubRepository,
@@ -17,17 +21,20 @@ import type {
   GitHubPullRequest,
   GitHubIssue,
   GitHubBranch,
+  BranchAssignableDeveloper,
 } from "../../services/githubService";
+import Modal from "../../components/ui/Modal";
 
 type Tab = "overview" | "commits" | "pulls" | "issues" | "branches";
 
-export default function PMGitHubIntegrationPage() {
+export default function PMGitHubIntegrationPage({ projectId }: { projectId?: string } = {}) {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId || "");
 
   const [repo, setRepo] = useState<GitHubRepository | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
@@ -41,8 +48,29 @@ export default function PMGitHubIntegrationPage() {
   // Form state
   const [repoUrl, setRepoUrl] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  // Create branch modal state
+  const [showCreateBranchModal, setShowCreateBranchModal] = useState(false);
+  const [newBranchName, setNewBranchName] = useState("");
+  const [baseBranch, setBaseBranch] = useState("main");
+  const [creatingBranch, setCreatingBranch] = useState(false);
+  const [branchError, setBranchError] = useState<string | null>(null);
+
+  // Link developer modal state
+  const [linkModalBranch, setLinkModalBranch] = useState<GitHubBranch | null>(null);
+  const [assignableDevs, setAssignableDevs] = useState<BranchAssignableDeveloper[]>([]);
+  const [loadingAssignables, setLoadingAssignables] = useState(false);
+  const [selectedDevId, setSelectedDevId] = useState("");
+  const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [savingLink, setSavingLink] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (projectId) {
+      setSelectedProjectId(projectId);
+      return;
+    }
     fetchManagedProjects()
       .then((data) => {
         setProjects(data);
@@ -51,11 +79,12 @@ export default function PMGitHubIntegrationPage() {
         }
       })
       .catch((err) => console.error("Failed to fetch projects", err));
-  }, []);
+  }, [projectId]);
 
-  const loadRepository = useCallback(async (projectId: string) => {
+  const loadRepository = useCallback(async (pId: string) => {
     setLoading(true);
     setError(null);
+    setSyncMessage(null);
     setRepo(null);
     setCommits([]);
     setPulls([]);
@@ -63,8 +92,11 @@ export default function PMGitHubIntegrationPage() {
     setBranches([]);
     setActiveTab("overview");
     try {
-      const repository = await getProjectRepository(projectId);
+      const repository = await getProjectRepository(pId);
       setRepo(repository);
+      if (repository?.default_branch) {
+        setBaseBranch(repository.default_branch);
+      }
     } catch (err: any) {
       if (err.message && err.message.includes("None")) {
         setRepo(null);
@@ -110,19 +142,107 @@ export default function PMGitHubIntegrationPage() {
   };
 
   const handleSync = async () => {
+    if (!selectedProjectId) return;
+    setSyncing(true);
+    setError(null);
+    setSyncMessage(null);
     try {
-      const updatedRepo = await syncRepository(selectedProjectId);
-      setRepo(updatedRepo);
-      // Reload tab data
-      const currentTab = activeTab;
-      setActiveTab("overview"); // Force a re-render/refetch trick or just clear states
-      setCommits([]);
-      setPulls([]);
-      setIssues([]);
-      setBranches([]);
-      setTimeout(() => setActiveTab(currentTab), 0);
+      const updated = await syncRepository(selectedProjectId);
+      setRepo(updated);
+      setSyncMessage("Repository synchronized successfully with GitHub.");
+      // Refresh tab data
+      if (activeTab === "branches") {
+        const b = await getBranches(selectedProjectId);
+        setBranches(b);
+      } else if (activeTab === "commits") {
+        const c = await getCommits(selectedProjectId);
+        setCommits(c);
+      } else if (activeTab === "pulls") {
+        const p = await getPullRequests(selectedProjectId);
+        setPulls(p);
+      }
     } catch (err: any) {
       setError(err.message || "Failed to sync repository");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleCreateBranch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBranchName.trim() || !selectedProjectId) return;
+    setCreatingBranch(true);
+    setBranchError(null);
+    try {
+      await createProjectBranch(selectedProjectId, {
+        branch_name: newBranchName.trim(),
+        base_branch: baseBranch || repo?.default_branch || "main",
+      });
+      setShowCreateBranchModal(false);
+      setNewBranchName("");
+      const updatedBranches = await getBranches(selectedProjectId);
+      setBranches(updatedBranches);
+    } catch (err: any) {
+      setBranchError(err.message || "Failed to create branch");
+    } finally {
+      setCreatingBranch(false);
+    }
+  };
+
+  const handleOpenLinkModal = async (branch: GitHubBranch) => {
+    setLinkModalBranch(branch);
+    setLinkError(null);
+    let devId = "";
+    let taskId = "";
+    if (typeof branch.linked_developer === "object" && branch.linked_developer) {
+      devId = branch.linked_developer.id || "";
+      taskId = branch.linked_developer.task_id || "";
+    }
+    setSelectedDevId(devId);
+    setSelectedTaskId(taskId);
+
+    if (selectedProjectId) {
+      setLoadingAssignables(true);
+      try {
+        const devs = await fetchProjectAssignableDevelopers(selectedProjectId);
+        setAssignableDevs(devs);
+      } catch (e: any) {
+        console.error("Failed to load assignable developers", e);
+      } finally {
+        setLoadingAssignables(false);
+      }
+    }
+  };
+
+  const handleSaveBranchLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProjectId || !linkModalBranch || !selectedDevId) return;
+    setSavingLink(true);
+    setLinkError(null);
+    try {
+      await assignBranchDeveloper(selectedProjectId, linkModalBranch.name, {
+        developer_id: selectedDevId,
+        task_id: selectedTaskId || null,
+      });
+      setLinkModalBranch(null);
+      const updated = await getBranches(selectedProjectId);
+      setBranches(updated);
+    } catch (err: any) {
+      setLinkError(err.message || "Failed to link developer to branch");
+    } finally {
+      setSavingLink(false);
+    }
+  };
+
+  const handleUnlinkBranch = async (branchName: string) => {
+    if (!selectedProjectId) return;
+    if (!confirm(`Are you sure you want to unlink the developer from branch "${branchName}"?`)) return;
+    try {
+      await unassignBranchDeveloper(selectedProjectId, branchName);
+      const updated = await getBranches(selectedProjectId);
+      setBranches(updated);
+    } catch (err: any) {
+      setError(err.message || "Failed to unlink developer");
     }
   };
 
@@ -268,20 +388,28 @@ export default function PMGitHubIntegrationPage() {
                   )}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <a
                   href={repo.html_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="btn-primary text-xs px-3 py-1.5 flex items-center justify-center"
+                  className="btn-primary text-xs px-3 py-1.5 flex items-center justify-center gap-1"
                 >
-                  Open GitHub Repository
+                  <span>Open GitHub</span>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
                 </a>
                 <button
                   onClick={handleSync}
-                  className="btn-secondary text-xs px-3 py-1.5"
+                  disabled={syncing}
+                  className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5"
+                  title="Synchronize repository branches, commits, and pull requests"
                 >
-                  Sync
+                  <svg className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>{syncing ? "Syncing..." : "Sync Repository"}</span>
                 </button>
                 <button
                   onClick={handleDisconnect}
@@ -291,6 +419,9 @@ export default function PMGitHubIntegrationPage() {
                 </button>
               </div>
             </div>
+            {syncMessage && (
+              <p className="mt-3 text-xs text-success-300 bg-success-500/10 p-2 rounded border border-success-500/20">{syncMessage}</p>
+            )}
           </div>
 
           {/* Tabs */}
@@ -466,50 +597,291 @@ export default function PMGitHubIntegrationPage() {
                 )}
               </div>
             ) : activeTab === "branches" ? (
-              <div className="divide-y divide-surface-700/50">
-                {branches.length === 0 ? (
-                  <p className="p-6 text-surface-500 text-center">
-                    No branches found.
-                  </p>
-                ) : (
-                  branches.map((b) => (
-                    <div
-                      key={b.name}
-                      className="p-4 hover:bg-surface-800/30 transition-colors flex justify-between items-center"
-                    >
-                      <div className="flex items-center gap-3">
-                        <svg
-                          className="w-4 h-4 text-surface-500"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
+              <div className="space-y-4">
+                <div className="p-4 bg-surface-800/40 border-b border-surface-700/50 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-surface-100">Discovered Branches</h4>
+                    <p className="text-xs text-surface-400">
+                      Synchronized branches from GitHub repository with developer assignments.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowCreateBranchModal(true)}
+                    className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>New Branch</span>
+                  </button>
+                </div>
+
+                <div className="divide-y divide-surface-700/50">
+                  {branches.length === 0 ? (
+                    <p className="p-6 text-surface-500 text-center">
+                      No branches found. Click Sync Repository to retrieve branches.
+                    </p>
+                  ) : (
+                    branches.map((b) => {
+                      const linkedDevName =
+                        typeof b.linked_developer === "object" && b.linked_developer !== null
+                          ? b.linked_developer.name
+                          : typeof b.linked_developer === "string"
+                          ? b.linked_developer
+                          : "Not linked";
+                      const linkedDevTask =
+                        typeof b.linked_developer === "object" && b.linked_developer !== null
+                          ? b.linked_developer.task_title
+                          : null;
+                      const isLinked = linkedDevName !== "Not linked";
+
+                      return (
+                        <div
+                          key={b.name}
+                          className="p-4 hover:bg-surface-800/30 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
-                          />
-                        </svg>
-                        <span className="text-surface-200 font-mono text-sm">
-                          {b.name}
-                        </span>
-                        {b.name === repo.default_branch && (
-                          <span className="badge bg-surface-700/50 text-surface-300 text-[10px] ml-2">
-                            Default
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs font-mono text-surface-500 ml-4 shrink-0">
-                        {b.last_commit_sha.substring(0, 7)}
-                      </span>
-                    </div>
-                  ))
-                )}
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-surface-100 font-mono text-sm font-semibold">
+                                {b.name}
+                              </span>
+                              {b.name === repo.default_branch && (
+                                <span className="badge bg-primary-500/20 text-primary-300 text-[10px]">
+                                  Default
+                                </span>
+                              )}
+                              {b.associated_pull_request && (
+                                <span className="badge bg-purple-500/20 text-purple-300 text-[10px]">
+                                  PR #{b.associated_pull_request}
+                                </span>
+                              )}
+                            </div>
+                            {b.last_commit_message && (
+                              <p className="text-surface-300 text-xs truncate max-w-lg">
+                                {b.last_commit_message}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-3 text-[11px] text-surface-400 flex-wrap">
+                              <span>Author: <strong className="text-surface-300">{b.last_commit_author || "Unknown"}</strong></span>
+                              {b.last_commit_date && (
+                                <span>• {new Date(b.last_commit_date).toLocaleString()}</span>
+                              )}
+                              <span>• Linked dev: <strong className={isLinked ? "text-primary-300 font-semibold" : "text-surface-400 italic"}>{linkedDevName}</strong></span>
+                              {linkedDevTask && (
+                                <span className="badge bg-surface-700/60 text-surface-300 text-[10px] px-2 py-0.5 rounded">
+                                  Task: {linkedDevTask}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            <span className="text-xs font-mono bg-surface-900 border border-surface-700 text-surface-300 px-2 py-1 rounded">
+                              {b.last_commit_sha ? b.last_commit_sha.substring(0, 7) : "—"}
+                            </span>
+                            <button
+                              onClick={() => handleOpenLinkModal(b)}
+                              className="btn-secondary text-xs py-1 px-2.5 flex items-center gap-1 hover:border-primary-500/50 transition-colors"
+                              title={isLinked ? "Change developer or task" : "Assign branch to developer"}
+                            >
+                              <span>🔗</span>
+                              <span>{isLinked ? "Change Link" : "Link Developer"}</span>
+                            </button>
+                            {isLinked && (
+                              <button
+                                onClick={() => handleUnlinkBranch(b.name)}
+                                className="text-xs py-1 px-2 rounded border border-danger-500/30 text-danger-400 hover:bg-danger-500/10 transition-colors"
+                                title="Unlink developer from this branch"
+                              >
+                                Unlink
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             ) : null}
           </div>
         </div>
+      )}
+
+      {/* Create Branch Modal */}
+      {showCreateBranchModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setShowCreateBranchModal(false)}
+          title="Create New Branch"
+          subtitle={`Create a new branch in ${repo?.full_name || "repository"}`}
+          maxWidthClass="max-w-md"
+        >
+          <form onSubmit={handleCreateBranch} className="p-4 sm:p-5 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-surface-300 mb-1">
+                Branch Name <span className="text-danger-400">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. feature/login-page"
+                value={newBranchName}
+                onChange={(e) => setNewBranchName(e.target.value)}
+                required
+                className="w-full bg-surface-900 border border-surface-700 rounded-lg px-3 py-2 text-surface-100 text-sm focus:outline-none focus:border-primary-500 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-surface-300 mb-1">
+                Base Branch
+              </label>
+              <select
+                value={baseBranch}
+                onChange={(e) => setBaseBranch(e.target.value)}
+                className="w-full bg-surface-900 border border-surface-700 rounded-lg px-3 py-2 text-surface-100 text-sm focus:outline-none focus:border-primary-500 font-mono"
+              >
+                {branches.length > 0 ? (
+                  branches.map((b) => (
+                    <option key={b.name} value={b.name}>
+                      {b.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value={repo?.default_branch || "main"}>
+                    {repo?.default_branch || "main"}
+                  </option>
+                )}
+              </select>
+            </div>
+
+            {branchError && (
+              <p className="text-xs text-danger-400 bg-danger-500/10 p-2 rounded border border-danger-500/20">
+                {branchError}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowCreateBranchModal(false)}
+                className="btn-secondary text-xs px-3 py-2"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={creatingBranch || !newBranchName.trim()}
+                className="btn-primary text-xs px-4 py-2"
+              >
+                {creatingBranch ? "Creating..." : "Create Branch"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Link Developer / Assign Branch Modal */}
+      {linkModalBranch && (
+        <Modal
+          isOpen={!!linkModalBranch}
+          onClose={() => setLinkModalBranch(null)}
+          title="🔗 Link Developer / Assign Branch"
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-surface-800/60 rounded-lg border border-surface-700/50 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-surface-400">Branch:</span>
+                <span className="font-mono text-surface-200 font-semibold">{linkModalBranch.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-surface-400">Latest Commit:</span>
+                <span className="text-surface-300 truncate max-w-[280px]">{linkModalBranch.last_commit_message || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-surface-400">Commit Author:</span>
+                <span className="text-surface-300 font-medium">{linkModalBranch.last_commit_author || "Unknown"}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveBranchLink} className="space-y-4">
+              <div>
+                <label className="block text-surface-300 text-xs font-semibold mb-1.5">
+                  Select Developer <span className="text-danger-400">*</span>
+                </label>
+                {loadingAssignables ? (
+                  <p className="text-xs text-surface-500 animate-pulse">Loading project developers…</p>
+                ) : assignableDevs.length === 0 ? (
+                  <p className="text-xs text-warning-400">No developers found for this project.</p>
+                ) : (
+                  <select
+                    value={selectedDevId}
+                    onChange={(e) => {
+                      setSelectedDevId(e.target.value);
+                      setSelectedTaskId("");
+                    }}
+                    className="w-full bg-surface-800 border border-surface-700 rounded-lg px-3 py-2 text-surface-100 text-sm focus:outline-none focus:border-primary-500"
+                    required
+                  >
+                    <option value="">-- Choose an assigned developer --</option>
+                    {assignableDevs.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} {d.email ? `(${d.email})` : ""} {d.tasks.length > 0 ? `— ${d.tasks.length} task(s)` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {selectedDevId && (
+                <div>
+                  <label className="block text-surface-300 text-xs font-semibold mb-1.5">
+                    Associate with Task <span className="text-surface-500 font-normal">(Optional)</span>
+                  </label>
+                  {(() => {
+                    const dev = assignableDevs.find((d) => d.id === selectedDevId);
+                    const devTasks = dev?.tasks || [];
+                    return (
+                      <select
+                        value={selectedTaskId}
+                        onChange={(e) => setSelectedTaskId(e.target.value)}
+                        className="w-full bg-surface-800 border border-surface-700 rounded-lg px-3 py-2 text-surface-100 text-sm focus:outline-none focus:border-primary-500"
+                      >
+                        <option value="">-- None / General Branch --</option>
+                        {devTasks.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            [{t.status}] {t.title}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {linkError && (
+                <div className="p-3 bg-danger-500/10 border border-danger-500/20 rounded-lg text-danger-400 text-xs">
+                  ⚠️ {linkError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-surface-800">
+                <button
+                  type="button"
+                  onClick={() => setLinkModalBranch(null)}
+                  className="btn-secondary text-xs px-4 py-2"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingLink || !selectedDevId}
+                  className="btn-primary text-xs px-4 py-2 disabled:opacity-50"
+                >
+                  {savingLink ? "Saving Link…" : "Save Assignment"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </Modal>
       )}
     </div>
   );

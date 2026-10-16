@@ -59,7 +59,12 @@ export async function fetchProfile(_userId?: string): Promise<Profile | null> {
     });
 
     if (!res.ok) {
-      // Fallback from localStorage auth_user if endpoint fails
+      if (res.status === 401) {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("auth_user");
+        return null;
+      }
+      // Fallback from localStorage auth_user if endpoint fails (network/5xx)
       const stored = localStorage.getItem("auth_user");
       if (stored) {
         return userRecordToProfile(JSON.parse(stored));

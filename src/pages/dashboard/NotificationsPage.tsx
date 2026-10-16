@@ -102,6 +102,18 @@ export default function NotificationsPage() {
       handleMarkAsRead(n.id);
     }
     const role = profile?.role || "DEVELOPER";
+
+    // Handle GitHub branch assignments or GitHub events
+    if (n.type === "GITHUB_EVENT" || n.title.toLowerCase().includes("github") || n.title.toLowerCase().includes("branch")) {
+      if (n.project_id) {
+        navigate(`/dashboard/projects/${n.project_id}?tab=github`);
+        return;
+      } else {
+        setError("This GitHub event does not have an associated project available.");
+        return;
+      }
+    }
+
     if (n.task_id) {
       if (role === "DEVELOPER") {
         navigate("/dashboard/my-tasks");
@@ -127,8 +139,11 @@ export default function NotificationsPage() {
       return [
         "TASK_ASSIGNED",
         "TASK_STATUS_CHANGED",
+        "TASK_REVIEW_REQUESTED",
+        "TASK_COMPLETED",
         "TASK_OVERDUE",
         "SMART_ALLOCATION",
+        "GITHUB_EVENT",
       ].includes(n.type);
     if (activeTab === "RISKS") return n.type === "RISK_ALERT";
     return true;
@@ -136,12 +151,36 @@ export default function NotificationsPage() {
 
   const getIcon = (type: NotificationType) => {
     switch (type) {
+      case "PROJECT_ASSIGNED":
+        return (
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+          </div>
+        );
       case "TASK_ASSIGNED":
       case "SMART_ALLOCATION":
         return (
           <div className="w-10 h-10 rounded-xl bg-primary-500/20 text-primary-400 border border-primary-500/30 flex items-center justify-center shrink-0">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+            </svg>
+          </div>
+        );
+      case "TASK_REVIEW_REQUESTED":
+        return (
+          <div className="w-10 h-10 rounded-xl bg-warning-500/20 text-warning-400 border border-warning-500/30 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+          </div>
+        );
+      case "TASK_COMPLETED":
+        return (
+          <div className="w-10 h-10 rounded-xl bg-success-500/20 text-success-400 border border-success-500/30 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
         );
@@ -363,16 +402,19 @@ export default function NotificationsPage() {
                   </p>
                   <div className="flex items-center gap-3 text-xs text-surface-500 mt-2">
                     <span>{formatDate(n.created_at)}</span>
-                    {n.task_id && (
+                    {(n.type === "GITHUB_EVENT" || n.title.toLowerCase().includes("github") || n.title.toLowerCase().includes("branch")) && n.project_id ? (
+                      <span className="text-purple-400 hover:text-purple-300 font-medium">
+                        View GitHub Branch →
+                      </span>
+                    ) : n.task_id ? (
                       <span className="hover:text-primary-400 font-medium">
                         View Task →
                       </span>
-                    )}
-                    {!n.task_id && n.project_id && (
+                    ) : n.project_id ? (
                       <span className="hover:text-primary-400 font-medium">
                         View Project →
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>
