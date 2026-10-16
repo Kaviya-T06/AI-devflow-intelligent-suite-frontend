@@ -24,7 +24,14 @@ async function request<T>(
     throw new Error(errorBody.detail || `HTTP ${response.status}`);
   }
 
-  return response.json() as Promise<T>;
+  if (response.status === 204) return undefined as unknown as T;
+  const text = await response.text();
+  if (!text || !text.trim()) return undefined as unknown as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as unknown as T;
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -261,11 +261,34 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [toast, setToast]       = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
-  // Modal state
+  // Modal & menu state
   const [modal, setModal]       = useState<"add" | "edit" | null>(null);
   const [editing, setEditing]   = useState<UserRecord | null>(null);
   const [deleting, setDeleting] = useState<UserRecord | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  // Close actions dropdown on click outside or Escape
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-actions-menu]")) {
+        setActiveMenuId(null);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveMenuId(null);
+    };
+
+    if (activeMenuId) {
+      document.addEventListener("mousedown", handleOutsideClick);
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeMenuId]);
 
   // ---------------------------------------------------------------------------
   // Data
@@ -482,18 +505,22 @@ export default function AdminUsersPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-surface-700/50">
-                  {["Name", "Email", "Role", "Status", "Created", "Actions"].map((h) => (
-                    <th key={h} className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">
-                      {h}
-                    </th>
-                  ))}
+                  <th className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Name</th>
+                  <th className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Email</th>
+                  <th className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Role</th>
+                  <th className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Status</th>
+                  <th className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Created</th>
+                  <th className="text-right text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-700/30">
-                {filtered.map((user) => {
+                {filtered.map((user, index) => {
                   const isSelf = currentUser?.id === user.id;
+                  const isMenuOpen = activeMenuId === user.id;
+                  const isNearBottom = index >= filtered.length - 2 && filtered.length > 2;
+
                   return (
-                    <tr key={user.id} className="hover:bg-surface-800/40 transition-colors group">
+                    <tr key={user.id} className="hover:bg-surface-800/40 transition-colors">
                       {/* Name */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -530,42 +557,122 @@ export default function AdminUsersPage() {
                       </td>
 
                       {/* Actions */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {/* Edit */}
+                      <td className="px-6 py-4 text-right">
+                        <div className="relative inline-block text-left" data-actions-menu>
                           <button
-                            onClick={() => { setEditing(user); setModal("edit"); }}
-                            className="text-xs px-2.5 py-1 rounded-lg border border-primary-500/30 text-primary-400 hover:bg-primary-500/10 transition-colors"
-                            id={`edit-user-${user.id}`}
-                          >
-                            Edit
-                          </button>
-
-                          {/* Activate / Deactivate */}
-                          <button
-                            onClick={() => handleStatusToggle(user)}
-                            disabled={toggling === user.id || isSelf}
-                            title={isSelf ? "You cannot change your own status" : undefined}
-                            className={`text-xs px-2.5 py-1 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                              user.is_active
-                                ? "border-warning-500/30 text-warning-400 hover:bg-warning-500/10"
-                                : "border-success-500/30 text-success-400 hover:bg-success-500/10"
+                            id={`user-actions-btn-${user.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(isMenuOpen ? null : user.id);
+                            }}
+                            className={`p-1.5 rounded-lg transition-colors focus:outline-none focus:ring-1 focus:ring-primary-500/50 ${
+                              isMenuOpen
+                                ? "bg-surface-700 text-surface-100"
+                                : "text-surface-400 hover:text-surface-100 hover:bg-surface-700/60"
                             }`}
-                            id={`toggle-user-${user.id}`}
+                            aria-label={`Actions menu for ${user.name}`}
+                            aria-expanded={isMenuOpen}
+                            aria-haspopup="true"
+                            title="Actions"
                           >
-                            {toggling === user.id ? "…" : user.is_active ? "Deactivate" : "Activate"}
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                              <circle cx="12" cy="5" r="1.75" />
+                              <circle cx="12" cy="12" r="1.75" />
+                              <circle cx="12" cy="19" r="1.75" />
+                            </svg>
                           </button>
 
-                          {/* Delete */}
-                          <button
-                            onClick={() => setDeleting(user)}
-                            disabled={isSelf}
-                            title={isSelf ? "You cannot delete your own account" : undefined}
-                            className="text-xs px-2.5 py-1 rounded-lg border border-danger-500/30 text-danger-400 hover:bg-danger-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            id={`delete-user-${user.id}`}
-                          >
-                            Delete
-                          </button>
+                          {/* Dropdown Menu */}
+                          {isMenuOpen && (
+                            <div
+                              className={`absolute right-0 ${
+                                isNearBottom
+                                  ? "bottom-full mb-1.5 origin-bottom-right"
+                                  : "top-full mt-1.5 origin-top-right"
+                              } w-44 rounded-xl bg-surface-800 border border-surface-700/80 shadow-2xl z-50 py-1.5 animate-in fade-in zoom-in-95 duration-100`}
+                              role="menu"
+                              aria-orientation="vertical"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {/* Edit */}
+                              <button
+                                id={`action-edit-${user.id}`}
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  setEditing(user);
+                                  setModal("edit");
+                                }}
+                                className="w-full text-left px-3.5 py-2 text-xs flex items-center gap-2.5 text-surface-200 hover:text-white hover:bg-surface-700/60 transition-colors"
+                                role="menuitem"
+                              >
+                                <svg className="w-4 h-4 text-primary-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                <span>Edit</span>
+                              </button>
+
+                              {/* Activate (show only when user is currently inactive) */}
+                              {!user.is_active && (
+                                <button
+                                  id={`action-activate-${user.id}`}
+                                  onClick={() => {
+                                    setActiveMenuId(null);
+                                    handleStatusToggle(user);
+                                  }}
+                                  disabled={toggling === user.id || isSelf}
+                                  title={isSelf ? "You cannot change your own status" : undefined}
+                                  className="w-full text-left px-3.5 py-2 text-xs flex items-center gap-2.5 text-success-400 hover:text-success-300 hover:bg-success-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                  role="menuitem"
+                                >
+                                  <svg className="w-4 h-4 text-success-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>{toggling === user.id ? "Activating…" : "Activate"}</span>
+                                </button>
+                              )}
+
+                              {/* Deactivate (show only when user is currently active) */}
+                              {user.is_active && (
+                                <button
+                                  id={`action-deactivate-${user.id}`}
+                                  onClick={() => {
+                                    setActiveMenuId(null);
+                                    handleStatusToggle(user);
+                                  }}
+                                  disabled={toggling === user.id || isSelf}
+                                  title={isSelf ? "You cannot change your own status" : undefined}
+                                  className="w-full text-left px-3.5 py-2 text-xs flex items-center gap-2.5 text-warning-400 hover:text-warning-300 hover:bg-warning-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                  role="menuitem"
+                                >
+                                  <svg className="w-4 h-4 text-warning-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>{toggling === user.id ? "Deactivating…" : "Deactivate"}</span>
+                                </button>
+                              )}
+
+                              {/* Divider */}
+                              <div className="my-1 border-t border-surface-700/60" />
+
+                              {/* Delete */}
+                              <button
+                                id={`action-delete-${user.id}`}
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  setDeleting(user);
+                                }}
+                                disabled={isSelf}
+                                title={isSelf ? "You cannot delete your own account" : undefined}
+                                className="w-full text-left px-3.5 py-2 text-xs flex items-center gap-2.5 text-danger-400 hover:text-danger-300 hover:bg-danger-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                role="menuitem"
+                              >
+                                <svg className="w-4 h-4 text-danger-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
