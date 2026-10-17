@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { fetchManagedProjects } from "../../services/pmService";
+import { fetchAllProjects } from "../../services/adminService";
+import { useAuth } from "../../context/AuthContext";
 import type { Project } from "../../types";
 import {
   getProjectRepository,
@@ -66,12 +68,16 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
   const [savingLink, setSavingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
 
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "ADMIN";
+
   useEffect(() => {
     if (projectId) {
       setSelectedProjectId(projectId);
       return;
     }
-    fetchManagedProjects()
+    const fetchFn = isAdmin ? fetchAllProjects : fetchManagedProjects;
+    fetchFn()
       .then((data) => {
         setProjects(data);
         if (data.length > 0) {
@@ -79,7 +85,7 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
         }
       })
       .catch((err) => console.error("Failed to fetch projects", err));
-  }, [projectId]);
+  }, [projectId, isAdmin]);
 
   const loadRepository = useCallback(async (pId: string) => {
     setLoading(true);

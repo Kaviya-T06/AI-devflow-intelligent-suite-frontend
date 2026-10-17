@@ -21,6 +21,7 @@ import {
   updateTaskEstimate,
   updateDeveloperCapacity,
 } from "../../services/pmService";
+import { deleteProject } from "../../services/adminService";
 import type {
   DeadlineSimulationResponse,
   ProjectSimulatorData,
@@ -1531,6 +1532,24 @@ export default function ProjectDetailPage() {
     </div>
   );
 
+  const isAdmin = profile?.role === "ADMIN";
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteProject = async () => {
+    if (!project) return;
+    setDeleting(true);
+    try {
+      await deleteProject(project.id);
+      navigate("/dashboard/projects");
+    } catch (e: any) {
+      setErr(e.message || "Failed to delete project");
+      setShowDeleteModal(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Breadcrumb */}
@@ -1548,8 +1567,61 @@ export default function ProjectDetailPage() {
           <h2 className="text-2xl font-bold text-surface-50">{project.name}</h2>
           {project.description && <p className="text-surface-400 text-sm mt-1">{project.description}</p>}
         </div>
-        <span className={statusBadge(project.status)}>{project.status.replace("_", " ")}</span>
+        <div className="flex items-center gap-3">
+          <span className={statusBadge(project.status)}>{project.status.replace("_", " ")}</span>
+          {isAdmin && (
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-danger-500/30 text-danger-400 hover:bg-danger-500/10 transition-colors"
+              id="delete-project-btn"
+            >
+              Delete Project
+            </button>
+          )}
+        </div>
       </div>
+
+      {showDeleteModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setShowDeleteModal(false)}
+          title="Delete Project Permanently"
+          maxWidthClass="max-w-sm"
+        >
+          <div className="space-y-4 p-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-danger-500/20 flex items-center justify-center mx-auto">
+              <svg className="w-6 h-6 text-danger-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-surface-200 text-sm font-semibold">{project.name}</p>
+              <p className="text-surface-400 text-xs mt-1">
+                Are you sure you want to permanently delete this project? This will remove all associated tasks, risks, and activity logs.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-center pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="btn-secondary text-xs px-4 py-2"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteProject}
+                disabled={deleting}
+                className="btn-danger text-xs px-4 py-2"
+                id="confirm-delete-project-btn"
+              >
+                {deleting ? "Deleting..." : "Delete Permanently"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Tab bar */}
       <div className="flex border-b border-surface-700/50 gap-1 overflow-x-auto">

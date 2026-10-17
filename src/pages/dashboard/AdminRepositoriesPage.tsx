@@ -326,6 +326,16 @@ export default function AdminRepositoriesPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
+                        {repo.project_id && (
+                          <a
+                            href={`/dashboard/projects/${repo.project_id}?tab=github`}
+                            className="text-xs px-3 py-1.5 rounded-lg border border-accent-500/30 text-accent-300 hover:bg-accent-500/10 transition-colors flex items-center gap-1"
+                            title="View branches, commits, PRs and Git activity"
+                          >
+                            <span>Git Activity</span>
+                            <span className="text-[10px]">↗</span>
+                          </a>
+                        )}
                         <button
                           onClick={() => { setEditing(repo); setModal("edit"); }}
                           className="text-xs px-3 py-1.5 rounded-lg border border-primary-500/30 text-primary-400 hover:bg-primary-500/10 transition-colors"

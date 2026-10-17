@@ -8,6 +8,7 @@ import {
   fetchAllProjects,
   createProject,
   updateProject,
+  deleteProject,
   fetchAllUsers,
   type UserRecord,
 } from "../../services/adminService";
@@ -294,6 +295,33 @@ function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: (
   );
 }
 
+// ---------------------------------------------------------------------------
+// Confirm Delete Modal (permanent deletion)
+// ---------------------------------------------------------------------------
+function ConfirmDeleteModal({ name, onConfirm, onClose }: { name: string; onConfirm: () => void; onClose: () => void }) {
+  useLockBodyScroll();
+  return createPortal(
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div className="glass-card w-full max-w-sm p-6 space-y-4 text-center shadow-2xl animate-fade-in relative">
+        <div className="w-12 h-12 rounded-full bg-danger-500/20 flex items-center justify-center mx-auto">
+          <svg className="w-6 h-6 text-danger-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        </div>
+        <div>
+          <h3 className="text-danger-300 font-bold text-lg">Delete Project Permanently</h3>
+          <p className="text-surface-400 text-sm mt-1">
+            This will <span className="text-danger-300 font-semibold">permanently delete</span> <span className="text-surface-200 font-medium">{name}</span> and all its associated tasks, risks, and activity logs. This action <span className="text-danger-300 font-semibold">cannot be undone</span>.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onConfirm} className="btn-danger flex-1" id="project-confirm-delete">Delete Permanently</button>
+          <button onClick={onClose}   className="btn-secondary flex-1" id="project-cancel-delete">Cancel</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function DropdownMenu({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
@@ -338,6 +366,7 @@ export default function AdminProjectsPage() {
   const [modal, setModal]       = useState<"add" | "edit" | null>(null);
   const [editing, setEditing]   = useState<Project | null>(null);
   const [archiving, setArchiving] = useState<Project | null>(null);
+  const [deleting, setDeleting] = useState<Project | null>(null);
   const [viewing, setViewing]   = useState<Project | null>(null);
   const [historyProject, setHistoryProject] = useState<Project | null>(null);
   const [toast, setToast]       = useState<string | null>(null);
@@ -458,6 +487,19 @@ export default function AdminProjectsPage() {
       setArchiving(null);
     }
   };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    try {
+      await deleteProject(deleting.id);
+      setProjects((prev) => prev.filter(p => p.id !== deleting.id));
+      showToast("Project permanently deleted");
+    } catch (e: any) {
+      setError(e.message || "Failed to delete project");
+    } finally {
+      setDeleting(null);
+    }
+  };
   
   const canManageProject = (p: Project) => {
     if (isAdmin) return true;
@@ -495,7 +537,13 @@ export default function AdminProjectsPage() {
           onClose={() => setArchiving(null)}
         />
       )}
-
+      {deleting && (
+        <ConfirmDeleteModal
+          name={deleting.name}
+          onConfirm={handleDelete}
+          onClose={() => setDeleting(null)}
+        />
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -642,10 +690,16 @@ export default function AdminProjectsPage() {
                           View Details
                         </button>
                         <button
-                          onClick={() => window.location.href = `/dashboard/admin/tasks?project_id=${project.id}`}
+                          onClick={() => window.location.href = `/dashboard/tasks?project_id=${project.id}`}
                           className="block w-full text-left px-4 py-2.5 text-sm text-surface-200 hover:bg-surface-700 hover:text-white transition-colors"
                         >
                           Tasks
+                        </button>
+                        <button
+                          onClick={() => window.location.href = `/dashboard/projects/${project.id}?tab=github`}
+                          className="block w-full text-left px-4 py-2.5 text-sm text-accent-300 hover:bg-surface-700 hover:text-accent-200 transition-colors"
+                        >
+                          Git Activity ↗
                         </button>
                         <button
                           onClick={() => setHistoryProject(project)}
@@ -666,10 +720,19 @@ export default function AdminProjectsPage() {
                             {project.status !== "archived" && (
                               <button
                                 onClick={() => setArchiving(project)}
-                                className="block w-full text-left px-4 py-2.5 text-sm text-danger-400 hover:bg-danger-500/10 transition-colors"
+                                className="block w-full text-left px-4 py-2.5 text-sm text-warning-400 hover:bg-warning-500/10 transition-colors"
                                 id={`archive-project-${project.id}`}
                               >
                                 Archive Project
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                onClick={() => setDeleting(project)}
+                                className="block w-full text-left px-4 py-2.5 text-sm text-danger-400 hover:bg-danger-500/10 transition-colors"
+                                id={`delete-project-${project.id}`}
+                              >
+                                Delete Project
                               </button>
                             )}
                           </>

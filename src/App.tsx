@@ -118,10 +118,6 @@ export default function App() {
                   element={<PMActivityPage />}
                 />
                 <Route
-                  path="/dashboard/github-integration"
-                  element={<PMGitHubIntegrationPage />}
-                />
-                <Route
                   path="/dashboard/pm-workflow-risks"
                   element={<PMWorkflowRisksPage />}
                 />
@@ -135,6 +131,14 @@ export default function App() {
                 />
               </Route>
 
+              {/* GitHub Integration — accessible to Managers and Admins */}
+              <Route element={<RoleRoute allowedRoles={["MANAGER", "ADMIN"]} />}>
+                <Route
+                  path="/dashboard/github-integration"
+                  element={<PMGitHubIntegrationPage />}
+                />
+              </Route>
+
               {/* Review & Oversight modules accessible to Managers and Admins */}
               <Route
                 element={<RoleRoute allowedRoles={["MANAGER", "ADMIN"]} />}
@@ -143,6 +147,10 @@ export default function App() {
                   path="/dashboard/pm-reviews"
                   element={<PMPendingReviewsPage />}
                 />
+              </Route>
+
+              {/* PM-only AI Continuity module */}
+              <Route element={<RoleRoute allowedRoles={["MANAGER"]} />}>
                 <Route
                   path="/dashboard/pm-ai-continuity"
                   element={<AIContinuityPage />}

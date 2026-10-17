@@ -308,6 +308,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ["MANAGER"],
     icon: <TeamTasksIcon />,
   },
+  // Manager & Admin shared / role-specific nav items
   {
     id: "pm-pending-reviews",
     label: "Pending Reviews",
@@ -337,15 +338,15 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "AI Continuity",
     path: "/dashboard/pm-ai-continuity",
     available: true,
-    roles: ["MANAGER", "ADMIN"],
+    roles: ["MANAGER"],
     icon: <AIIcon />,
   },
   {
-    id: "pm-github-integration",
+    id: "github-integration",
     label: "GitHub Integration",
     path: "/dashboard/github-integration",
     available: true,
-    roles: ["MANAGER"],
+    roles: ["MANAGER", "ADMIN"],
     icon: <GitHubIcon />,
   },
   {
@@ -427,7 +428,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "AI Insights",
     path: "/dashboard/ai-insights",
     available: false,
-    roles: ["ADMIN"],
+    roles: ["MANAGER", "DEVELOPER"],
     icon: <AIIcon />,
   },
 ];
