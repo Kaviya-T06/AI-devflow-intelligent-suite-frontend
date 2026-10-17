@@ -44,10 +44,23 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 // ---------------------------------------------------------------------------
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const initialSession = getCurrentSession();
+  const [user, setUser] = useState<AuthUser | null>(() => initialSession?.user ?? null);
+  const [token, setToken] = useState<string | null>(() => initialSession?.token ?? null);
+  const [profile, setProfile] = useState<Profile | null>(() => {
+    if (!initialSession?.user) return null;
+    return {
+      id: initialSession.user.id,
+      full_name: initialSession.user.name,
+      email: initialSession.user.email,
+      role: normalizeRole(initialSession.user.role),
+      avatar_url: null,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const syncProfile = useCallback(async (authUser: AuthUser | null) => {
     if (!authUser) {
@@ -66,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setProfile(optimistic);
+    setProfile((prev) => (prev ? { ...prev, role: normalizeRole(authUser.role) } : optimistic));
 
     // Fetch freshest profile from backend
     try {
@@ -88,6 +101,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (session) {
       setUser(session.user);
       setToken(session.token);
+      const optimistic: Profile = {
+        id: session.user.id,
+        full_name: session.user.name,
+        email: session.user.email,
+        role: normalizeRole(session.user.role),
+        avatar_url: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setProfile((prev) => prev ?? optimistic);
       syncProfile(session.user);
     } else {
       setUser(null);

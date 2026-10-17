@@ -34,6 +34,7 @@ import PMGitHubIntegrationPage from "./pages/dashboard/PMGitHubIntegrationPage";
 import PMWorkflowRisksPage from "./pages/dashboard/PMWorkflowRisksPage";
 import PMSmartAllocationPage from "./pages/dashboard/PMSmartAllocationPage";
 import PMWhatIfSimulatorPage from "./pages/dashboard/PMWhatIfSimulatorPage";
+import PMPendingReviewsPage from "./pages/dashboard/PMPendingReviewsPage";
 // Developer pages
 import DeveloperWorkflowRisksPage from "./pages/dashboard/DeveloperWorkflowRisksPage";
 import AIContinuityPage from "./pages/dashboard/AIContinuityPage";
@@ -134,9 +135,14 @@ export default function App() {
                 />
               </Route>
 
+              {/* Review & Oversight modules accessible to Managers and Admins */}
               <Route
                 element={<RoleRoute allowedRoles={["MANAGER", "ADMIN"]} />}
               >
+                <Route
+                  path="/dashboard/pm-reviews"
+                  element={<PMPendingReviewsPage />}
+                />
                 <Route
                   path="/dashboard/pm-ai-continuity"
                   element={<AIContinuityPage />}

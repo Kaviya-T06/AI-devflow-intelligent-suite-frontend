@@ -37,28 +37,35 @@ export default function Modal({
 }: ModalProps) {
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const modalBoxRef = useRef<HTMLDivElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Capture triggering focus & lock scroll
   useEffect(() => {
     if (!isOpen) return;
 
-    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    // Only record previous focus if the active element was outside the modal
+    if (!modalBoxRef.current?.contains(document.activeElement)) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+    }
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // Focus close button or first focusable element inside modal
-    const focusable = modalBoxRef.current?.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    if (focusable && focusable.length > 0) {
-      focusable[0].focus();
+    // Initial autofocus only when active element is not already inside the modal
+    if (!modalBoxRef.current?.contains(document.activeElement)) {
+      const focusable = modalBoxRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable && focusable.length > 0) {
+        focusable[0].focus();
+      }
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
       }
     };
 
@@ -71,7 +78,7 @@ export default function Modal({
         previousFocusRef.current.focus();
       }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

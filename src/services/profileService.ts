@@ -21,6 +21,7 @@ export function normalizeRole(roleStr?: string): UserRole {
   const upper = roleStr.toUpperCase();
   if (upper === "ADMIN") return "ADMIN";
   if (upper === "PROJECT_MANAGER" || upper === "MANAGER") return "MANAGER";
+  if (upper === "TEAM_MEMBER") return "TEAM_MEMBER";
   return "DEVELOPER";
 }
 

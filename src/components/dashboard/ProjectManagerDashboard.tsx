@@ -9,7 +9,9 @@ import { useAuth } from "../../context/AuthContext";
 import {
   fetchPMDashboardStats,
 } from "../../services/pmService";
-import type { PMDashboardStats, ProjectSummary, OverdueTaskSummary } from "../../types";
+import { fetchPendingReviews } from "../../services/taskSubmissionService";
+import type { PMDashboardStats, ProjectSummary, OverdueTaskSummary, PendingReviewTask } from "../../types";
+import TaskReviewModal from "./TaskReviewModal";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -233,14 +235,20 @@ export default function ProjectManagerDashboard() {
   const navigate = useNavigate();
 
   const [stats, setStats] = useState<PMDashboardStats | null>(null);
+  const [pendingReviews, setPendingReviews] = useState<PendingReviewTask[]>([]);
+  const [selectedReviewTask, setSelectedReviewTask] = useState<PendingReviewTask | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
   const loadStats = useCallback(async () => {
     try {
-      const data = await fetchPMDashboardStats();
-      setStats(data);
+      const [statsData, reviewsData] = await Promise.all([
+        fetchPMDashboardStats(),
+        fetchPendingReviews().catch(() => []),
+      ]);
+      setStats(statsData);
+      setPendingReviews(reviewsData);
       setError(null);
       setLastRefreshed(new Date());
     } catch (err) {
@@ -462,6 +470,92 @@ export default function ProjectManagerDashboard() {
             )}
           </div>
 
+          {/* Pending Reviews Section */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="section-title text-warning-400 flex items-center gap-2">
+                <span>🔍</span> Pending Reviews
+                {pendingReviews.length > 0 && (
+                  <span className="badge bg-warning-500/15 text-warning-300 border border-warning-500/20 text-xs">
+                    {pendingReviews.length}
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={() => navigate("/dashboard/pm-reviews")}
+                className="text-primary-400 text-xs hover:underline"
+              >
+                View all reviews →
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="glass-card p-5 animate-pulse space-y-3">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <div key={i} className="h-10 bg-surface-700/60 rounded" />
+                ))}
+              </div>
+            ) : pendingReviews.length === 0 ? (
+              <div className="glass-card p-6 text-center">
+                <span className="text-2xl mb-1 block">✅</span>
+                <p className="text-surface-300 text-sm font-medium">No tasks pending review</p>
+                <p className="text-surface-500 text-xs mt-0.5">
+                  Submissions awaiting your review will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="glass-card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-surface-700/30 text-surface-400 font-semibold uppercase tracking-wider">
+                        <th className="px-4 py-3">Task</th>
+                        <th className="px-4 py-3">Project</th>
+                        <th className="px-4 py-3">Developer</th>
+                        <th className="px-4 py-3">Submitted</th>
+                        <th className="px-4 py-3 text-center">Submissions</th>
+                        <th className="px-4 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-700/20">
+                      {pendingReviews.slice(0, 5).map((pr) => (
+                        <tr key={pr.task_id} className="hover:bg-surface-800/40 transition-colors">
+                          <td className="px-4 py-3 text-surface-200 font-medium">
+                            {pr.task_title}
+                          </td>
+                          <td className="px-4 py-3 text-surface-400">
+                            {pr.project_name || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-surface-300">
+                            {pr.developer_name || "Unassigned"}
+                          </td>
+                          <td className="px-4 py-3 text-surface-400">
+                            {pr.submitted_at
+                              ? new Date(pr.submitted_at).toLocaleDateString()
+                              : "Recently"}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="badge bg-surface-700/50 text-surface-300 text-[11px] px-2 py-0.5 rounded-full">
+                              #{pr.submission_count || 1}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => setSelectedReviewTask(pr)}
+                              className="btn-primary text-xs py-1 px-3"
+                            >
+                              View Submission
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Overdue tasks */}
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -592,6 +686,17 @@ export default function ProjectManagerDashboard() {
             )}
           </div>
         </>
+      )}
+
+      {selectedReviewTask && (
+        <TaskReviewModal
+          isOpen={true}
+          task={selectedReviewTask}
+          onClose={() => setSelectedReviewTask(null)}
+          onDecisionCompleted={() => {
+            loadStats();
+          }}
+        />
       )}
     </div>
   );

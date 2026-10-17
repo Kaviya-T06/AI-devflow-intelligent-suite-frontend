@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fetchAllTasks, fetchAllProjects, updateTask } from "../../services/adminService";
+import { fetchTaskSubmissions } from "../../services/taskSubmissionService";
 import { useAuth } from "../../context/AuthContext";
-import type { Task, TaskStatus, Project } from "../../types";
+import type { Task, TaskStatus, Project, TaskSubmission } from "../../types";
 import Modal from "../ui/Modal";
+import TaskSubmissionModal from "./TaskSubmissionModal";
+import TaskReviewModal from "./TaskReviewModal";
 import {
   getTaskGitHubContext,
   associateTaskBranch,
@@ -37,6 +40,14 @@ export default function MyTasksBoard() {
   const [ghError, setGhError] = useState<string | null>(null);
   const [ghSuccess, setGhSuccess] = useState<string | null>(null);
 
+  // Submissions and Reviews workflow state
+  const [taskSubmissions, setTaskSubmissions] = useState<TaskSubmission[]>([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+  const [taskToSubmit, setTaskToSubmit] = useState<Task | null>(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+
   useEffect(() => {
     if (!selectedTask) {
       setGithubContext(null);
@@ -44,6 +55,7 @@ export default function MyTasksBoard() {
       setPrUrlInput("");
       setGhError(null);
       setGhSuccess(null);
+      setTaskSubmissions([]);
       return;
     }
     setGhLoading(true);
@@ -59,6 +71,17 @@ export default function MyTasksBoard() {
         console.warn("GitHub context not available for task", err);
       })
       .finally(() => setGhLoading(false));
+
+    // Load submission & review history for selected task
+    setLoadingSubmissions(true);
+    fetchTaskSubmissions(selectedTask.id)
+      .then((subs) => {
+        setTaskSubmissions(subs);
+      })
+      .catch((err) => {
+        console.warn("Submissions not available for task", err);
+      })
+      .finally(() => setLoadingSubmissions(false));
   }, [selectedTask]);
 
   const handleAssociateBranch = async () => {
@@ -128,6 +151,9 @@ export default function MyTasksBoard() {
     try {
       await updateTask(taskId, { status: newStatus });
       await loadTasks();
+      if (selectedTask && selectedTask.id === taskId) {
+        setSelectedTask({ ...selectedTask, status: newStatus });
+      }
     } catch (err: any) {
       alert("Error updating task: " + err.message);
     }
@@ -169,6 +195,12 @@ export default function MyTasksBoard() {
   const completedTasks = filteredTasks.filter(t => t.status === "COMPLETED");
   const overdueTasks = filteredTasks.filter(isOverdue);
 
+  // Latest review info helper
+  const latestSubWithReview = taskSubmissions.length > 0 ? taskSubmissions[taskSubmissions.length - 1] : null;
+  const latestReviewDecision = latestSubWithReview?.reviews && latestSubWithReview.reviews.length > 0
+    ? latestSubWithReview.reviews[latestSubWithReview.reviews.length - 1]
+    : null;
+
   const TaskCard = ({ task }: { task: Task }) => (
     <div 
       className={`glass-card p-4 flex flex-col gap-2 cursor-pointer hover:bg-surface-800/40 transition-colors ${isOverdue(task) ? 'border-danger-500/50' : ''}`}
@@ -197,21 +229,28 @@ export default function MyTasksBoard() {
           </button>
         )}
         {task.status === "IN_PROGRESS" && (
-          <button onClick={() => handleStatusChange(task.id, "REVIEW")} className="btn-secondary text-xs py-1.5 px-3">
+          <button
+            onClick={() => {
+              setTaskToSubmit(task);
+              setIsSubmissionModalOpen(true);
+            }}
+            className="btn-primary text-xs py-1.5 px-3"
+          >
             Submit for Review
           </button>
         )}
         {task.status === "REVIEW" && (
           <>
             {canApprove ? (
-              <>
-                <button onClick={() => handleStatusChange(task.id, "IN_PROGRESS")} className="btn-secondary text-xs py-1.5 px-3">
-                  Needs Work
-                </button>
-                <button onClick={() => handleStatusChange(task.id, "COMPLETED")} className="btn-primary bg-success-500 hover:bg-success-600 text-xs py-1.5 px-3">
-                  Approve Task
-                </button>
-              </>
+              <button
+                onClick={() => {
+                  setSelectedTask(task);
+                  setIsReviewModalOpen(true);
+                }}
+                className="btn-primary bg-primary-600 hover:bg-primary-500 text-xs py-1.5 px-3"
+              >
+                Review Submission
+              </button>
             ) : (
               <span className="text-xs text-warning-400 font-medium flex items-center gap-1.5 py-1 px-2 rounded bg-warning-500/10 border border-warning-500/20">
                 <span className="text-[10px]">⏳</span> Awaiting PM Review
@@ -230,6 +269,15 @@ export default function MyTasksBoard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {actionSuccessMsg && (
+        <div className="bg-success-500/10 border border-success-500/20 text-success-300 p-3.5 rounded-xl text-sm flex items-center justify-between">
+          <span>✅ {actionSuccessMsg}</span>
+          <button onClick={() => setActionSuccessMsg(null)} className="text-xs underline text-surface-400 hover:text-surface-200">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h3 className="section-title">My Tasks</h3>
@@ -350,30 +398,89 @@ export default function MyTasksBoard() {
           subtitle={`Status: ${selectedTask.status.replace("_", " ")} • Priority: ${selectedTask.priority}`}
           maxWidthClass="max-w-3xl"
         >
-          <div className="p-4 sm:p-6 space-y-6">
-            <div>
-              <h4 className="text-surface-400 text-xs font-semibold uppercase tracking-wider mb-2">Description</h4>
-              <p className="text-surface-200 text-sm whitespace-pre-wrap">{selectedTask.description || "No description provided."}</p>
+          <div className="p-4 sm:p-6 space-y-6 max-h-[82vh] overflow-y-auto">
+            {/* Project & Assigned PM Header Info */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-surface-900/60 rounded-xl border border-surface-700/40 text-xs">
+              <div>
+                <span className="text-surface-400 block font-medium">Project</span>
+                <span className="text-surface-100 font-semibold truncate block">
+                  {selectedTask.project_name || projects.find(p => p.id === selectedTask.project_id)?.name || "—"}
+                </span>
+              </div>
+              <div>
+                <span className="text-surface-400 block font-medium">Project Manager</span>
+                <span className="text-surface-100 font-semibold truncate block">
+                  {selectedTask.project_manager_name || projects.find(p => p.id === selectedTask.project_id)?.project_manager?.full_name || "Unassigned"}
+                </span>
+              </div>
+              <div>
+                <span className="text-surface-400 block font-medium">Priority</span>
+                <span className="text-surface-100 font-semibold">{selectedTask.priority}</span>
+              </div>
+              <div>
+                <span className="text-surface-400 block font-medium">Due Date</span>
+                <span className="text-surface-100 font-semibold">
+                  {selectedTask.due_date ? new Date(selectedTask.due_date).toLocaleDateString() : "None"}
+                </span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <p className="text-surface-400 text-xs">Due Date</p>
-                <p className="text-surface-100 text-sm">{selectedTask.due_date ? new Date(selectedTask.due_date).toLocaleDateString() : "None"}</p>
-              </div>
-              <div>
-                <p className="text-surface-400 text-xs">Created</p>
-                <p className="text-surface-100 text-sm">{selectedTask.created_at ? new Date(selectedTask.created_at).toLocaleDateString() : "Unknown"}</p>
-              </div>
-              <div>
-                <p className="text-surface-400 text-xs">Priority</p>
-                <p className="text-surface-100 text-sm">{selectedTask.priority}</p>
-              </div>
-              <div>
-                <p className="text-surface-400 text-xs">Status</p>
-                <p className="text-surface-100 text-sm font-semibold text-primary-400">{selectedTask.status.replace("_", " ")}</p>
-              </div>
+            {/* Description */}
+            <div>
+              <h4 className="text-surface-400 text-xs font-semibold uppercase tracking-wider mb-2">Description</h4>
+              <p className="text-surface-200 text-sm whitespace-pre-wrap bg-surface-800/40 p-3 rounded-lg border border-surface-700/50">
+                {selectedTask.description || "No description provided."}
+              </p>
             </div>
+
+            {/* Acceptance Criteria */}
+            {selectedTask.acceptance_criteria && (
+              <div>
+                <h4 className="text-surface-400 text-xs font-semibold uppercase tracking-wider mb-2">Acceptance Criteria</h4>
+                <p className="text-surface-200 text-xs whitespace-pre-wrap bg-surface-900/80 p-3 rounded-lg border border-surface-700/60 font-mono text-[11px]">
+                  {selectedTask.acceptance_criteria}
+                </p>
+              </div>
+            )}
+
+            {/* Review Feedback Alert Banner if changes requested or rejected */}
+            {latestReviewDecision && latestReviewDecision.decision !== "APPROVE" && selectedTask.status === "IN_PROGRESS" && (
+              <div
+                className={`p-4 rounded-xl border flex flex-col gap-2 ${
+                  latestReviewDecision.decision === "REQUEST_CHANGES"
+                    ? "bg-warning-500/10 border-warning-500/30 text-warning-300"
+                    : "bg-danger-500/10 border-danger-500/30 text-danger-300"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <span>{latestReviewDecision.decision === "REQUEST_CHANGES" ? "🔄" : "❌"}</span>
+                    {latestReviewDecision.decision === "REQUEST_CHANGES"
+                      ? "Manager Requested Changes"
+                      : "Submission Rejected"}
+                  </span>
+                  <span className="text-[11px] opacity-80">
+                    by {latestReviewDecision.reviewer_name || "Manager"} · {new Date(latestReviewDecision.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                {latestReviewDecision.review_comment && (
+                  <p className="text-xs bg-surface-950/50 p-2.5 rounded-lg border border-surface-800/80 italic text-surface-100">
+                    "{latestReviewDecision.review_comment}"
+                  </p>
+                )}
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={() => {
+                      setTaskToSubmit(selectedTask);
+                      setIsSubmissionModalOpen(true);
+                    }}
+                    className="btn-primary text-xs py-1 px-3 shadow"
+                  >
+                    Resubmit for Review →
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Workflow Action Controls */}
             <div className="p-3 bg-surface-800/40 rounded-xl border border-surface-700/50 flex flex-wrap items-center justify-between gap-3">
@@ -396,37 +503,94 @@ export default function MyTasksBoard() {
                 {selectedTask.status === "IN_PROGRESS" && (
                   <button
                     onClick={() => {
-                      handleStatusChange(selectedTask.id, "REVIEW");
-                      setSelectedTask({ ...selectedTask, status: "REVIEW" });
+                      setTaskToSubmit(selectedTask);
+                      setIsSubmissionModalOpen(true);
                     }}
                     className="btn-primary text-xs py-1.5 px-3"
                   >
                     👀 Submit for Review
                   </button>
                 )}
-                {selectedTask.status === "REVIEW" && canApprove && (
+                {selectedTask.status === "REVIEW" && (
                   <>
-                    <button
-                      onClick={() => {
-                        handleStatusChange(selectedTask.id, "COMPLETED");
-                        setSelectedTask({ ...selectedTask, status: "COMPLETED" });
-                      }}
-                      className="bg-success-600 hover:bg-success-500 text-white font-medium text-xs py-1.5 px-3 rounded-lg transition-colors"
-                    >
-                      ✓ Approve
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleStatusChange(selectedTask.id, "IN_PROGRESS");
-                        setSelectedTask({ ...selectedTask, status: "IN_PROGRESS" });
-                      }}
-                      className="bg-warning-600 hover:bg-warning-500 text-white font-medium text-xs py-1.5 px-3 rounded-lg transition-colors"
-                    >
-                      ↩ Request Revisions
-                    </button>
+                    {canApprove ? (
+                      <button
+                        onClick={() => setIsReviewModalOpen(true)}
+                        className="btn-primary bg-primary-600 hover:bg-primary-500 text-xs py-1.5 px-3"
+                      >
+                        Review Submission
+                      </button>
+                    ) : (
+                      <span className="text-xs text-warning-400 font-medium flex items-center gap-1.5 py-1 px-2 rounded bg-warning-500/10 border border-warning-500/20">
+                        <span className="text-[10px]">⏳</span> Awaiting PM Review
+                      </span>
+                    )}
                   </>
                 )}
+                {selectedTask.status === "COMPLETED" && (
+                  <span className="text-xs text-success-400 font-medium flex items-center gap-1 py-1 px-2 rounded bg-success-500/10 border border-success-500/20">
+                    <span>✓</span> Completed
+                  </span>
+                )}
               </div>
+            </div>
+
+            {/* Existing Submissions & Review History */}
+            <div className="glass-card p-4 rounded-xl border border-surface-700/50 space-y-3">
+              <div className="flex items-center justify-between border-b border-surface-700/40 pb-2">
+                <h4 className="text-surface-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                  <span>📜</span> Submission & Review History ({taskSubmissions.length})
+                </h4>
+              </div>
+
+              {loadingSubmissions ? (
+                <p className="text-surface-400 text-xs py-2 animate-pulse">Loading submission history...</p>
+              ) : taskSubmissions.length === 0 ? (
+                <p className="text-surface-500 text-xs py-2 italic">
+                  No submissions yet. Once you submit this task for review, submission details will be saved here.
+                </p>
+              ) : (
+                <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                  {taskSubmissions.map((sub) => (
+                    <div
+                      key={sub.id}
+                      className="bg-surface-900/60 p-3 rounded-lg border border-surface-800 text-xs space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-surface-200">
+                          Submission #{sub.submission_number}
+                        </span>
+                        <span className="text-surface-500 text-[11px]">
+                          {new Date(sub.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-surface-300 text-[11px]"><strong className="text-surface-400">Work:</strong> {sub.work_summary}</p>
+                      <p className="text-surface-300 text-[11px]"><strong className="text-surface-400">Testing:</strong> {sub.testing_performed}</p>
+                      {sub.pull_request_url && (
+                        <p className="text-primary-400 text-[11px] truncate">
+                          PR: <a href={sub.pull_request_url} target="_blank" rel="noreferrer" className="underline">{sub.pull_request_url}</a>
+                        </p>
+                      )}
+                      {sub.reviews && sub.reviews.length > 0 && (
+                        <div className="border-t border-surface-800 pt-1.5 mt-1.5 space-y-1">
+                          {sub.reviews.map((rev) => (
+                            <div key={rev.id} className="text-[11px] flex items-start gap-1.5">
+                              <span className={`px-1.5 py-0.2 rounded font-semibold text-[10px] ${
+                                rev.decision === "APPROVE" ? "bg-success-500/20 text-success-300" :
+                                rev.decision === "REQUEST_CHANGES" ? "bg-warning-500/20 text-warning-300" :
+                                "bg-danger-500/20 text-danger-300"
+                              }`}>
+                                {rev.decision}
+                              </span>
+                              <span className="text-surface-400">{rev.review_comment}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* GitHub Integration Context for Task */}
@@ -597,6 +761,40 @@ export default function MyTasksBoard() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Developer Task Submission Modal */}
+      {isSubmissionModalOpen && taskToSubmit && (
+        <TaskSubmissionModal
+          isOpen={true}
+          task={taskToSubmit}
+          defaultPrUrl={githubContext?.associated_pull_request_url || ""}
+          onClose={() => {
+            setIsSubmissionModalOpen(false);
+            setTaskToSubmit(null);
+          }}
+          onSuccess={(newSub) => {
+            setActionSuccessMsg(`Task "${taskToSubmit.title}" was submitted for review!`);
+            loadTasks();
+            if (selectedTask && selectedTask.id === taskToSubmit.id) {
+              setSelectedTask({ ...selectedTask, status: "REVIEW" });
+              setTaskSubmissions(prev => [...prev, newSub]);
+            }
+          }}
+        />
+      )}
+
+      {/* PM Review Modal */}
+      {isReviewModalOpen && selectedTask && (
+        <TaskReviewModal
+          isOpen={true}
+          task={selectedTask}
+          onClose={() => setIsReviewModalOpen(false)}
+          onDecisionCompleted={() => {
+            loadTasks();
+            setSelectedTask(null);
+          }}
+        />
       )}
     </div>
   );

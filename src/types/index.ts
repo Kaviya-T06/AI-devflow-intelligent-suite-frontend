@@ -120,13 +120,131 @@ export interface Task {
   min_experience_years?: number;
   estimated_hours?: number | null;
   estimated_effort?: number | null;
+  acceptance_criteria?: string | null;
   // Joined fields from backend flat response
   project_name?: string | null;
   developer_name?: string | null;
+  project_manager_id?: string | null;
+  project_manager_name?: string | null;
   
   // Joined
   project?: Pick<Project, "id" | "name"> | null;
   assignee?: Pick<Profile, "id" | "full_name" | "email"> | null;
+}
+
+// ---------------------------------------------------------------------------
+// Task Submissions & PM Reviews
+// ---------------------------------------------------------------------------
+
+export type ReviewDecision = "APPROVE" | "REQUEST_CHANGES" | "REJECT";
+export type SubmissionStatus = "PENDING" | "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
+
+export interface TaskReview {
+  id: string;
+  task_id: string;
+  submission_id: string;
+  reviewer_id: string;
+  reviewer_name?: string | null;
+  reviewer_email?: string | null;
+  decision: ReviewDecision;
+  review_comment?: string | null;
+  created_at: string;
+}
+
+export interface TaskAttachment {
+  id: string;
+  task_id: string;
+  submission_id: string;
+  uploaded_by: string;
+  uploader_name?: string | null;
+  filename: string;
+  storage_path: string;
+  mime_type: string;
+  size: number;
+  created_at: string;
+  preview_url?: string | null;
+  download_url?: string | null;
+}
+
+export interface TaskSubmission {
+  id: string;
+  task_id: string;
+  submitted_by: string;
+  submitter_name?: string | null;
+  submitter_email?: string | null;
+  work_summary: string;
+  implementation_details: string;
+  testing_performed: string;
+  pull_request_url?: string | null;
+  deliverable_url?: string | null;
+  additional_comments?: string | null;
+  submission_number: number;
+  status: SubmissionStatus;
+  created_at: string;
+  updated_at?: string | null;
+  reviews?: TaskReview[];
+  attachments?: TaskAttachment[];
+}
+
+export interface PendingReviewTask {
+  task_id: string;
+  task_title: string;
+  task_description?: string | null;
+  acceptance_criteria?: string | null;
+  priority: TaskPriority;
+  due_date?: string | null;
+  status: TaskStatus;
+  project_id?: string | null;
+  project_name?: string | null;
+  project_manager_id?: string | null;
+  project_manager_name?: string | null;
+  developer_id?: string | null;
+  developer_name?: string | null;
+  developer_email?: string | null;
+  submission_count: number;
+  latest_submission?: TaskSubmission | null;
+  submitted_at?: string | null;
+}
+
+export interface GitHubEvidence {
+  available: boolean;
+  message?: string | null;
+  repository_name?: string | null;
+  pull_request_url?: string | null;
+  pull_request_number?: number | null;
+  title?: string | null;
+  status?: string | null;
+  is_merged?: boolean | null;
+  author?: string | null;
+  additions?: number | null;
+  deletions?: number | null;
+  changed_files_count?: number | null;
+  changed_files?: Array<{
+    filename: string;
+    status: string;
+    additions: number;
+    deletions: number;
+    changes: number;
+  }>;
+  reviews?: Array<{
+    reviewer?: string;
+    state?: string;
+    submitted_at?: string;
+  }>;
+}
+
+export interface TaskSubmissionPayload {
+  work_summary: string;
+  implementation_details: string;
+  testing_performed: string;
+  pull_request_url?: string | null;
+  deliverable_url?: string | null;
+  additional_comments?: string | null;
+}
+
+export interface TaskReviewPayload {
+  decision: ReviewDecision;
+  review_comment?: string | null;
 }
 
 // ---------------------------------------------------------------------------
