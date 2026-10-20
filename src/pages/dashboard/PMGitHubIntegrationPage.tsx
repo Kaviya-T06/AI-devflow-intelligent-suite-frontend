@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { fetchManagedProjects } from "../../services/pmService";
 import { fetchAllProjects } from "../../services/adminService";
 import { useAuth } from "../../context/AuthContext";
@@ -73,6 +73,15 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
   const { profile } = useAuth();
   const isAdmin = profile?.role === "ADMIN";
 
+  // Track the current load request to prevent stale async responses from
+  // overwriting data that belongs to a different (more recently selected) project.
+  const activeLoadRef = useRef<symbol | null>(null);
+  // Always reflect the latest selectedProjectId so tab-data guards work correctly.
+  const selectedProjectIdRef = useRef<string>(selectedProjectId);
+
+  // Keep ref in sync with state on every render.
+  selectedProjectIdRef.current = selectedProjectId;
+
   useEffect(() => {
     if (projectId) {
       setSelectedProjectId(projectId);
@@ -90,6 +99,11 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
   }, [projectId, isAdmin]);
 
   const loadRepository = useCallback(async (pId: string) => {
+    // Create a unique token for this specific load request.
+    const requestToken = Symbol(pId);
+    activeLoadRef.current = requestToken;
+
+    // Immediately clear all previous project's data before fetching new data.
     setLoading(true);
     setError(null);
     setSyncMessage(null);
@@ -102,13 +116,22 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
     setTabErrors({});
     setLoadedTabs({});
     setActiveTab("overview");
+
     try {
       const repository = await getProjectRepository(pId);
+
+      // Guard: discard this response if a newer project was selected while
+      // this request was in flight.
+      if (activeLoadRef.current !== requestToken) return;
+
       setRepo(repository);
       if (repository?.default_branch) {
         setBaseBranch(repository.default_branch);
       }
     } catch (err: any) {
+      // Guard: discard stale error responses too.
+      if (activeLoadRef.current !== requestToken) return;
+
       const msg = (err?.message || "").toLowerCase();
       if (
         msg.includes("none") ||
@@ -122,7 +145,10 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
         setError(err.message || "Failed to load repository info");
       }
     } finally {
-      setLoading(false);
+      // Guard: only clear the loading spinner if this is still the active request.
+      if (activeLoadRef.current === requestToken) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -262,31 +288,44 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
       if (!selectedProjectId || !repo || tab === "overview") return;
       if (!force && loadedTabs[tab]) return;
 
+      // Capture the project ID this fetch is for, so we can verify it on completion.
+      // Use a ref-snapshot to get the live value at call time; subsequent checks
+      // also read from the ref so stale closures cannot cause cross-project pollution.
+      const fetchingForProject = selectedProjectIdRef.current;
+
       setLoadingTabs((prev) => ({ ...prev, [tab]: true }));
       setTabErrors((prev) => ({ ...prev, [tab]: null }));
 
       try {
         if (tab === "commits") {
-          const data = await getCommits(selectedProjectId);
+          const data = await getCommits(fetchingForProject);
+          // Discard if the user switched projects while this request was in flight.
+          if (selectedProjectIdRef.current !== fetchingForProject) return;
           setCommits(data);
         } else if (tab === "pulls") {
-          const data = await getPullRequests(selectedProjectId);
+          const data = await getPullRequests(fetchingForProject);
+          if (selectedProjectIdRef.current !== fetchingForProject) return;
           setPulls(data);
         } else if (tab === "issues") {
-          const data = await getIssues(selectedProjectId);
+          const data = await getIssues(fetchingForProject);
+          if (selectedProjectIdRef.current !== fetchingForProject) return;
           setIssues(data);
         } else if (tab === "branches") {
-          const data = await getBranches(selectedProjectId);
+          const data = await getBranches(fetchingForProject);
+          if (selectedProjectIdRef.current !== fetchingForProject) return;
           setBranches(data);
         }
+        if (selectedProjectIdRef.current !== fetchingForProject) return;
         setLoadedTabs((prev) => ({ ...prev, [tab]: true }));
       } catch (err: any) {
+        if (selectedProjectIdRef.current !== fetchingForProject) return;
         console.error(`Failed to load ${tab} data:`, err);
         setTabErrors((prev) => ({
           ...prev,
           [tab]: err.message || `Failed to load ${tab} from GitHub.`,
         }));
       } finally {
+        if (selectedProjectIdRef.current !== fetchingForProject) return;
         setLoadingTabs((prev) => ({ ...prev, [tab]: false }));
       }
     },
