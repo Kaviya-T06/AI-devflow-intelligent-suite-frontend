@@ -45,7 +45,9 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
   const [pulls, setPulls] = useState<GitHubPullRequest[]>([]);
   const [issues, setIssues] = useState<GitHubIssue[]>([]);
   const [branches, setBranches] = useState<GitHubBranch[]>([]);
-  const [tabLoading, setTabLoading] = useState(false);
+  const [loadingTabs, setLoadingTabs] = useState<Partial<Record<Tab, boolean>>>({});
+  const [tabErrors, setTabErrors] = useState<Partial<Record<Tab, string | null>>>({});
+  const [loadedTabs, setLoadedTabs] = useState<Partial<Record<Tab, boolean>>>({});
 
   // Form state
   const [repoUrl, setRepoUrl] = useState("");
@@ -96,6 +98,9 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
     setPulls([]);
     setIssues([]);
     setBranches([]);
+    setLoadingTabs({});
+    setTabErrors({});
+    setLoadedTabs({});
     setActiveTab("overview");
     try {
       const repository = await getProjectRepository(pId);
@@ -104,7 +109,14 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
         setBaseBranch(repository.default_branch);
       }
     } catch (err: any) {
-      if (err.message && err.message.includes("None")) {
+      const msg = (err?.message || "").toLowerCase();
+      if (
+        msg.includes("none") ||
+        msg.includes("404") ||
+        msg.includes("not found") ||
+        msg.includes("no repository connected") ||
+        msg.includes("no github repository connected")
+      ) {
         setRepo(null);
       } else {
         setError(err.message || "Failed to load repository info");
@@ -157,15 +169,8 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
       setRepo(updated);
       setSyncMessage("Repository synchronized successfully with GitHub.");
       // Refresh tab data
-      if (activeTab === "branches") {
-        const b = await getBranches(selectedProjectId);
-        setBranches(b);
-      } else if (activeTab === "commits") {
-        const c = await getCommits(selectedProjectId);
-        setCommits(c);
-      } else if (activeTab === "pulls") {
-        const p = await getPullRequests(selectedProjectId);
-        setPulls(p);
+      if (activeTab !== "overview") {
+        await loadTabData(activeTab, true);
       }
     } catch (err: any) {
       setError(err.message || "Failed to sync repository");
@@ -252,33 +257,47 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
     }
   };
 
-  const loadTabData = async (tab: Tab) => {
-    if (!selectedProjectId || !repo) return;
-    setTabLoading(true);
-    try {
-      if (tab === "commits" && commits.length === 0) {
-        const data = await getCommits(selectedProjectId);
-        setCommits(data);
-      } else if (tab === "pulls" && pulls.length === 0) {
-        const data = await getPullRequests(selectedProjectId);
-        setPulls(data);
-      } else if (tab === "issues" && issues.length === 0) {
-        const data = await getIssues(selectedProjectId);
-        setIssues(data);
-      } else if (tab === "branches" && branches.length === 0) {
-        const data = await getBranches(selectedProjectId);
-        setBranches(data);
+  const loadTabData = useCallback(
+    async (tab: Tab, force = false) => {
+      if (!selectedProjectId || !repo || tab === "overview") return;
+      if (!force && loadedTabs[tab]) return;
+
+      setLoadingTabs((prev) => ({ ...prev, [tab]: true }));
+      setTabErrors((prev) => ({ ...prev, [tab]: null }));
+
+      try {
+        if (tab === "commits") {
+          const data = await getCommits(selectedProjectId);
+          setCommits(data);
+        } else if (tab === "pulls") {
+          const data = await getPullRequests(selectedProjectId);
+          setPulls(data);
+        } else if (tab === "issues") {
+          const data = await getIssues(selectedProjectId);
+          setIssues(data);
+        } else if (tab === "branches") {
+          const data = await getBranches(selectedProjectId);
+          setBranches(data);
+        }
+        setLoadedTabs((prev) => ({ ...prev, [tab]: true }));
+      } catch (err: any) {
+        console.error(`Failed to load ${tab} data:`, err);
+        setTabErrors((prev) => ({
+          ...prev,
+          [tab]: err.message || `Failed to load ${tab} from GitHub.`,
+        }));
+      } finally {
+        setLoadingTabs((prev) => ({ ...prev, [tab]: false }));
       }
-    } catch (err: any) {
-      console.error("Failed to load tab data", err);
-    } finally {
-      setTabLoading(false);
-    }
-  };
+    },
+    [selectedProjectId, repo, loadedTabs]
+  );
 
   useEffect(() => {
-    loadTabData(activeTab);
-  }, [activeTab, selectedProjectId, repo]);
+    if (repo && selectedProjectId && activeTab !== "overview") {
+      loadTabData(activeTab);
+    }
+  }, [activeTab, selectedProjectId, repo, loadTabData]);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
 
@@ -329,7 +348,7 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
         <div className="glass-card p-12 text-center border-dashed border-2 border-surface-700/50">
           <span className="text-5xl mb-4 block">🐙</span>
           <h3 className="text-xl font-bold text-surface-100 mb-2">
-            GitHub Repository Not Connected
+            No GitHub repository connected
           </h3>
           <p className="text-surface-400 text-sm mb-8">
             Connect this project to its GitHub repository to monitor development
@@ -455,9 +474,29 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
 
           {/* Tab Content */}
           <div className="glass-card p-0 min-h-[300px]">
-            {tabLoading && activeTab !== "overview" ? (
-              <div className="p-6 text-center text-surface-500 animate-pulse">
-                Loading data from GitHub...
+            {loadingTabs[activeTab] && activeTab !== "overview" ? (
+              <div className="p-8 text-center text-surface-400 animate-pulse" data-testid={`tab-loading-${activeTab}`}>
+                Loading {activeTab === "commits" ? "commits" : activeTab === "pulls" ? "pull requests" : activeTab === "issues" ? "issues" : "branches"} from GitHub...
+              </div>
+            ) : tabErrors[activeTab] && activeTab !== "overview" ? (
+              <div className="p-8 text-center" data-testid={`tab-error-${activeTab}`}>
+                <div className="inline-block p-4 rounded-lg bg-danger-500/10 border border-danger-500/20 text-danger-400 max-w-lg text-left">
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl">⚠️</span>
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-sm">
+                        Failed to load {activeTab === "commits" ? "commits" : activeTab === "pulls" ? "pull requests" : activeTab === "issues" ? "issues" : "branches"}
+                      </h4>
+                      <p className="text-xs text-danger-300 mt-1">{tabErrors[activeTab]}</p>
+                      <button
+                        onClick={() => loadTabData(activeTab, true)}
+                        className="mt-3 btn-secondary text-xs px-3 py-1.5"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : activeTab === "overview" ? (
               <div className="p-6 space-y-4">

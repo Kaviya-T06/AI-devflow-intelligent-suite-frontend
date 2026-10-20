@@ -110,10 +110,13 @@ export async function getProjectRepository(
       `/projects/${projectId}/repository`,
     );
   } catch (e: any) {
+    const msg = (e?.message || "").toLowerCase();
     if (
-      e.message.includes("404") ||
-      e.message.includes("Not Found") ||
-      e.message.includes("None")
+      msg.includes("404") ||
+      msg.includes("not found") ||
+      msg.includes("none") ||
+      msg.includes("no repository connected") ||
+      msg.includes("no github repository connected")
     ) {
       return null;
     }
