@@ -106,21 +106,6 @@ const WorkflowRisksIcon = () => (
     />
   </svg>
 );
-const RepositoriesIcon = () => (
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-    strokeWidth={1.8}
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-    />
-  </svg>
-);
 const AnalyticsIcon = () => (
   <svg
     className="w-5 h-5"
@@ -399,14 +384,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: <WorkflowRisksIcon />,
   },
   {
-    id: "repositories",
-    label: "Repositories",
-    path: "/dashboard/repositories",
-    available: true,
-    roles: ["ADMIN"],
-    icon: <RepositoriesIcon />,
-  },
-  {
     id: "settings",
     label: "Settings",
     path: "/dashboard/settings",
@@ -428,7 +405,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "AI Insights",
     path: "/dashboard/ai-insights",
     available: false,
-    roles: ["MANAGER", "DEVELOPER"],
+    roles: ["MANAGER"],
     icon: <AIIcon />,
   },
 ];

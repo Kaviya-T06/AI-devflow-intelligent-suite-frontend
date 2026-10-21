@@ -696,12 +696,6 @@ export default function AdminProjectsPage() {
                           Tasks
                         </button>
                         <button
-                          onClick={() => window.location.href = `/dashboard/projects/${project.id}?tab=github`}
-                          className="block w-full text-left px-4 py-2.5 text-sm text-accent-300 hover:bg-surface-700 hover:text-accent-200 transition-colors"
-                        >
-                          Git Activity ↗
-                        </button>
-                        <button
                           onClick={() => setHistoryProject(project)}
                           className="block w-full text-left px-4 py-2.5 text-sm text-surface-200 hover:bg-surface-700 hover:text-white transition-colors"
                         >

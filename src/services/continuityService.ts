@@ -30,6 +30,45 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
+export interface NextDeveloperPlanItem {
+  priority: "Critical" | "High" | "Medium" | "Low" | string;
+  action: string;
+  why: string;
+  artifact: string;
+  prerequisites: string;
+  next_step: string;
+}
+
+export interface AttentionRequiredItem {
+  category: "CONFIRMED_ISSUE" | "POTENTIAL_CONCERN" | "UNCHECKED_AREA" | string;
+  title: string;
+  severity: "Critical" | "High" | "Medium" | "Low" | string;
+  detail: string;
+  evidence: string;
+}
+
+export interface ChecklistItem {
+  step: number;
+  title: string;
+  description: string;
+  status: "completed" | "attention" | "ready" | string;
+}
+
+export interface DataCoverageSource {
+  name: string;
+  verified: boolean;
+  detail: string;
+}
+
+export interface DataCoverageAudit {
+  verified_count: number;
+  total_sources: number;
+  score_percent: number;
+  sources: DataCoverageSource[];
+  confidence_level: "High" | "Moderate" | "Low" | string;
+  missing_summary: string;
+}
+
 export interface ContinuitySummary {
   project_overview: string;
   previous_developer_work: string;
@@ -50,11 +89,26 @@ export interface ContinuitySummary {
       commits: any[];
       pull_requests: any[];
       issues: any[];
+      branches?: any[];
+      branches_error?: string | null;
     };
     verified_mappings: string[];
     unmapped_commits: any[];
     unmapped_prs: any[];
   };
+  is_preliminary_inference?: boolean;
+  inference_rationale?: string;
+  next_developer_plan?: NextDeveloperPlanItem[];
+  attention_required?: AttentionRequiredItem[];
+  checklist?: ChecklistItem[];
+  data_coverage?: DataCoverageAudit;
+}
+
+export interface ProjectContextUpdatePayload {
+  description?: string;
+  tech_stack?: string;
+  repository_url?: string;
+  handover_notes?: string;
 }
 
 export async function generateContinuitySummary(projectId: string, token: string): Promise<ContinuitySummary> {
@@ -76,15 +130,156 @@ export async function askContinuityQuestion(
   projectId: string, 
   question: string, 
   token: string,
-  messages?: ChatMessage[]
+  messages?: ChatMessage[],
+  signal?: AbortSignal
 ): Promise<{ answer: string }> {
+  const path = projectId && projectId !== "general"
+    ? `/api/v1/projects/${projectId}/continuity/ask`
+    : `/api/v1/continuity/ask`;
   return request<{ answer: string }>(
-    `/api/v1/projects/${projectId}/continuity/ask`,
+    path,
     {
       method: "POST",
       body: JSON.stringify({ question, messages }),
+      signal,
     },
     token
   );
 }
 
+export async function streamContinuityQuestion(
+  projectId: string,
+  question: string,
+  token: string,
+  messages?: ChatMessage[],
+  onChunk?: (chunk: string) => void,
+  signal?: AbortSignal
+): Promise<string> {
+  const path = projectId && projectId !== "general"
+    ? `/api/v1/projects/${projectId}/continuity/stream`
+    : `/api/v1/continuity/stream`;
+
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ question, messages }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const fallback = await askContinuityQuestion(projectId, question, token, messages, signal);
+      if (onChunk) onChunk(fallback.answer);
+      return fallback.answer;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      const fallback = await askContinuityQuestion(projectId, question, token, messages, signal);
+      if (onChunk) onChunk(fallback.answer);
+      return fallback.answer;
+    }
+
+    const decoder = new TextDecoder("utf-8");
+    let accumulated = "";
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+
+        const jsonStr = trimmed.slice(5).trim();
+        if (!jsonStr) continue;
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed.done) break;
+          if (parsed.chunk) {
+            accumulated += parsed.chunk;
+            if (onChunk) onChunk(accumulated);
+          }
+        } catch {
+          // ignore partial parse errors
+        }
+      }
+    }
+
+    if (!accumulated.trim()) {
+      const fallback = await askContinuityQuestion(projectId, question, token, messages, signal);
+      if (onChunk) onChunk(fallback.answer);
+      return fallback.answer;
+    }
+
+    return accumulated;
+  } catch (err: any) {
+    if (err.name === "AbortError" || signal?.aborted) {
+      throw err;
+    }
+    // Graceful fallback to askContinuityQuestion on network/stream errors
+    const fallback = await askContinuityQuestion(projectId, question, token, messages, signal);
+    if (onChunk) onChunk(fallback.answer);
+    return fallback.answer;
+  }
+}
+export interface AIStatusResponse {
+  provider: string;
+  model: string;
+  status: "ready" | "unavailable";
+  health?: {
+    available?: boolean;
+    model_installed?: boolean;
+    installed_models?: string[];
+    error?: string;
+  };
+}
+
+export async function getContinuityAiStatus(projectId: string, token: string): Promise<AIStatusResponse> {
+  const path = projectId && projectId !== "general"
+    ? `/api/v1/projects/${projectId}/continuity/status`
+    : `/api/v1/continuity/status`;
+  return request<AIStatusResponse>(
+    path,
+    {
+      method: "GET",
+    },
+    token
+  );
+}
+
+export async function getContinuityDataBriefing(projectId: string, token: string): Promise<ContinuitySummary> {
+  return request<ContinuitySummary>(
+    `/api/v1/projects/${projectId}/continuity/briefing`,
+    {
+      method: "GET",
+    },
+    token
+  );
+}
+
+export async function updateContinuityProjectContext(
+  projectId: string,
+  data: ProjectContextUpdatePayload,
+  token: string
+): Promise<ContinuitySummary> {
+  return request<ContinuitySummary>(
+    `/api/v1/projects/${projectId}/continuity/context`,
+    {
+      method: "PUT",
+      body: JSON.stringify(data),
+    },
+    token
+  );
+}
