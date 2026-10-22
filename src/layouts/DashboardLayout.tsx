@@ -437,7 +437,6 @@ export const ROLE_NAV_ORDER: Record<UserRole, string[]> = {
     "pm-ai-continuity",
     "analytics",
     "notifications",
-    "ai-insights",
   ],
   DEVELOPER: [
     "dashboard",
