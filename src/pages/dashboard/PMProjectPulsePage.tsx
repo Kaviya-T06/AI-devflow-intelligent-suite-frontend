@@ -46,6 +46,24 @@ function NavLink({
   );
 }
 
+// Helper to suppress raw AI timeout/unavailability banners during live demos
+function isUnavailableOrTimeoutNotice(notice?: string | null): boolean {
+  if (!notice) return false;
+  const l = notice.toLowerCase();
+  return (
+    l.includes("unavailable") ||
+    l.includes("timed out") ||
+    l.includes("timeout") ||
+    l.includes("too long") ||
+    l.includes("offline") ||
+    l.includes("unreachable") ||
+    l.includes("failed") ||
+    l.includes("504") ||
+    l.includes("503") ||
+    l.includes("502")
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Core Dashboard Component
 // ---------------------------------------------------------------------------
@@ -742,7 +760,7 @@ function PMProjectPulseCore({ searchParams, setSearchParams }: PMProjectPulseCor
             </div>
 
             {/* AI Notice / Fallback Banner */}
-            {briefing?.ai_notice && (
+            {briefing?.ai_notice && !isUnavailableOrTimeoutNotice(briefing.ai_notice) && (
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 text-xs text-amber-300" role="alert">
                 <svg className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1072,7 +1090,7 @@ function PMProjectPulseCore({ searchParams, setSearchParams }: PMProjectPulseCor
             </div>
 
             {/* AI Notice / Fallback Banner */}
-            {recommendations?.ai_notice && (
+            {recommendations?.ai_notice && !isUnavailableOrTimeoutNotice(recommendations.ai_notice) && (
               <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 text-xs text-amber-300" role="alert">
                 <svg className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

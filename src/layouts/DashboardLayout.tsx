@@ -2,7 +2,7 @@
  * DashboardLayout — persistent sidebar + top header shell for all dashboard pages.
  */
 import { useState, useEffect, type ReactNode } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { fetchUnreadCount } from "../services/notificationService";
 import type { UserRole } from "../types";
@@ -400,14 +400,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ["ADMIN", "MANAGER", "DEVELOPER"],
     icon: <AnalyticsIcon />,
   },
-  {
-    id: "ai-insights",
-    label: "AI Insights",
-    path: "/dashboard/ai-insights",
-    available: false,
-    roles: ["MANAGER"],
-    icon: <AIIcon />,
-  },
 ];
 
 const RoleBadge = ({ role }: { role: UserRole }) => {
@@ -688,8 +680,11 @@ export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const { profile } = useAuth();
+  const location = useLocation();
   // Default to ADMIN when profile hasn't loaded yet (pre-DB: fallback profile synthesized in profileService)
   const role = (profile?.role ?? "ADMIN") as UserRole;
+
+  const isAIContinuity = location.pathname.includes("ai-continuity");
 
   useEffect(() => {
     let isMounted = true;
@@ -710,16 +705,22 @@ export default function DashboardLayout() {
   }, []);
 
   return (
-    <div className="min-h-screen flex">
+    <div className={`min-h-screen flex ${isAIContinuity ? "h-screen overflow-hidden" : ""}`}>
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         role={role}
         unreadCount={unreadCount}
       />
-      <div className="flex-1 flex flex-col lg:ml-60 min-w-0">
+      <div className={`flex-1 flex flex-col lg:ml-60 min-w-0 ${isAIContinuity ? "h-full overflow-hidden" : ""}`}>
         <TopHeader onMenuClick={() => setSidebarOpen(true)} unreadCount={unreadCount} />
-        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
+        <main
+          className={`flex-1 ${
+            isAIContinuity
+              ? "p-0 overflow-hidden flex flex-col min-h-0"
+              : "p-4 lg:p-8 overflow-y-auto"
+          }`}
+        >
           <Outlet />
         </main>
       </div>
