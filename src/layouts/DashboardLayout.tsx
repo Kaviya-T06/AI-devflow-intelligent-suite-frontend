@@ -323,7 +323,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "AI Continuity",
     path: "/dashboard/pm-ai-continuity",
     available: true,
-    roles: ["MANAGER"],
+    roles: ["MANAGER", "ADMIN"],
     icon: <AIIcon />,
   },
   {

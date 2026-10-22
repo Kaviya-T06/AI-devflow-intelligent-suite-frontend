@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import {
   Sparkles,
   Send,
@@ -17,6 +17,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Cpu,
   RefreshCw,
   Terminal,
@@ -273,6 +274,7 @@ function MarkdownMessage({ content }: { content: string }) {
 
 export default function AIContinuityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const initialProjectId = searchParams.get("project") || "";
 
   const [projects, setProjects] = useState<{ id: string; name: string; status: string }[]>([]);
@@ -281,6 +283,15 @@ export default function AIContinuityPage() {
 
   // Active View Mode: Chat Workspace vs. Handover Intelligence Dossier
   const [activeTab, setActiveTab] = useState<"chat" | "dossier">("chat");
+
+  // Whenever AI Continuity is navigated to via sidebar route change, reset to chat view by default
+  const prevPathnameRef = useRef(location.pathname);
+  useEffect(() => {
+    if (prevPathnameRef.current !== location.pathname) {
+      prevPathnameRef.current = location.pathname;
+      setActiveTab("chat");
+    }
+  }, [location.pathname]);
 
   // Summary state
   const [summary, setSummary] = useState<ContinuitySummary | null>(null);
@@ -291,9 +302,8 @@ export default function AIContinuityPage() {
   // Context drawer toggle (for quick peek inside chat workspace)
   const [showContextDrawer, setShowContextDrawer] = useState(false);
 
-  // AI Service Status
+  // AI Service Status (verified silently in background)
   const [aiStatus, setAiStatus] = useState<AIStatusResponse | null>(null);
-  const [checkingStatus, setCheckingStatus] = useState(false);
 
   // Chat state per project (preserves history when switching projects)
   const [chatHistoryByProject, setChatHistoryByProject] = useState<Record<string, ChatMessageItem[]>>({});
@@ -301,6 +311,7 @@ export default function AIContinuityPage() {
   const [asking, setAsking] = useState(false);
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // Interactive Checklist check state
   const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({});
@@ -360,9 +371,8 @@ export default function AIContinuityPage() {
     }
   }, [selectedProjectId, setSearchParams]);
 
-  // Fetch AI status
+  // Fetch AI status silently in background
   const checkStatus = useCallback(async (projId: string) => {
-    setCheckingStatus(true);
     try {
       const token = localStorage.getItem("access_token") || "";
       const status = await getContinuityAiStatus(projId || "general", token);
@@ -373,8 +383,6 @@ export default function AIContinuityPage() {
         model: "llama3.2:1b",
         status: "unavailable",
       });
-    } finally {
-      setCheckingStatus(false);
     }
   }, []);
 
@@ -710,6 +718,9 @@ export default function AIContinuityPage() {
   const commits = github?.commits || [];
   const pullRequests = github?.pull_requests || [];
   const unmappedPrs = ctx?.unmapped_prs || [];
+  const unmappedCommits = ctx?.unmapped_commits || commits || [];
+  const verifiedMappings = ctx?.verified_mappings || [];
+  const hasVerifiedMappings = verifiedMappings.length > 0;
 
   const whatDeveloperShouldKnow = useMemo(() => {
     if (!ctx) return [];
@@ -739,37 +750,72 @@ export default function AIContinuityPage() {
 
   const activeFocusTask = inProgressWork[0] || tasks[0];
 
+  // Calculate actual duration/age of pending work from database task dates
+  const pendingAgeInfo = useMemo(() => {
+    if (!pendingWork || pendingWork.length === 0) return null;
+    const datedTasks = pendingWork.filter((t: any) => t.created_at || t.createdDate);
+    if (datedTasks.length === 0) return null;
+
+    const oldest = datedTasks.reduce((prev: any, curr: any) => {
+      const prevTime = new Date(prev.created_at || prev.createdDate).getTime();
+      const currTime = new Date(curr.created_at || curr.createdDate).getTime();
+      return currTime < prevTime ? curr : prev;
+    });
+
+    const createdTime = new Date(oldest.created_at || oldest.createdDate).getTime();
+    if (isNaN(createdTime)) return null;
+
+    const diffMs = Date.now() - createdTime;
+    if (diffMs < 0) return null;
+
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffWeeks = Math.floor(diffDays / 7);
+
+    if (diffWeeks >= 1) {
+      return {
+        durationStr: `${diffWeeks} ${diffWeeks === 1 ? "week" : "weeks"}`,
+        oldestTitle: oldest.title,
+      };
+    }
+    if (diffDays >= 1) {
+      return {
+        durationStr: `${diffDays} ${diffDays === 1 ? "day" : "days"}`,
+        oldestTitle: oldest.title,
+      };
+    }
+    return {
+      durationStr: "recently created",
+      oldestTitle: oldest.title,
+    };
+  }, [pendingWork]);
+
   return (
-    <div className="flex flex-col h-[calc(100vh-5.5rem)] max-h-[calc(100vh-5.5rem)] w-full overflow-hidden bg-surface-950 text-surface-100 rounded-2xl border border-surface-800/90 shadow-2xl relative">
+    <div className="flex flex-col h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-7.2rem)] w-full overflow-hidden bg-surface-950 text-surface-100 rounded-2xl border border-surface-800/90 shadow-2xl relative">
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* Top Header & Workspace Title                                       */}
+      {/* Top Header: Sleek, unobtrusive workspace bar                        */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      <header className="px-4 py-2.5 bg-surface-900/95 backdrop-blur-md border-b border-surface-800/80 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
-        {/* Left: Branding & Model identity */}
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary-600 via-indigo-600 to-primary-400 p-0.5 shadow-md shadow-primary-500/20 flex items-center justify-center">
-            <div className="w-full h-full bg-surface-950 rounded-[10px] flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-400 animate-pulse" />
-            </div>
+      <header className="px-4 py-2 bg-surface-900/95 backdrop-blur-md border-b border-surface-800/80 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20 min-h-[44px]">
+        {/* Left: Minimal workspace identity (leaves hero as the primary focal point) */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-surface-800/80 border border-surface-700/60 flex items-center justify-center text-primary-400 shrink-0">
+            <Sparkles className="w-3.5 h-3.5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
-                ✨ AI Project Summary & Continuity
-              </h1>
-              <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary-500/10 text-primary-300 border border-primary-500/20">
-                Workspace
-              </span>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-surface-200 tracking-tight">
+              AI Continuity
+            </span>
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-surface-800 text-surface-400 border border-surface-700/60">
+              Workspace
+            </span>
           </div>
         </div>
 
-        {/* Center: Mode Switcher (Conversational Chat vs. Handover Intelligence Dossier) */}
-        <div className="flex items-center bg-surface-950/80 p-0.5 rounded-xl border border-surface-800">
+        {/* Center: Clean Mode Switcher (AI Workspace vs. Handover Intelligence Dossier) */}
+        <div className="flex items-center bg-surface-950/80 p-0.5 rounded-lg border border-surface-800">
           <button
             type="button"
             onClick={() => setActiveTab("chat")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
               activeTab === "chat"
                 ? "bg-primary-600 text-white shadow-sm shadow-primary-600/30"
                 : "text-surface-400 hover:text-surface-200"
@@ -780,8 +826,13 @@ export default function AIContinuityPage() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("dossier")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            onClick={() => {
+              setActiveTab("dossier");
+              if (!summary && selectedProjectId) {
+                handleGenerate();
+              }
+            }}
+            className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
               activeTab === "dossier"
                 ? "bg-primary-600 text-white shadow-sm shadow-primary-600/30"
                 : "text-surface-400 hover:text-surface-200"
@@ -797,46 +848,16 @@ export default function AIContinuityPage() {
           </button>
         </div>
 
-        {/* Right: Controls & Context Drawer Toggle */}
+        {/* Right: Project Selector & Clear Chat */}
         <div className="flex items-center gap-2 ml-auto">
-          {/* AI Model Status Badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-950/70 border border-surface-800 text-xs">
-            <Cpu className="w-3.5 h-3.5 text-surface-400" />
-            {checkingStatus ? (
-              <span className="text-[11px] text-surface-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-surface-400 animate-pulse" />
-                Checking...
-              </span>
-            ) : asking ? (
-              <span className="text-[11px] font-medium text-primary-400 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-ping" />
-                DevFlow AI Generating...
-              </span>
-            ) : aiStatus?.status === "ready" ? (
-              <span className="text-[11px] font-medium text-emerald-400 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                {aiStatus.model || "llama3.2:1b"} · Ready
-              </span>
-            ) : (
-              <button
-                onClick={() => checkStatus(selectedProjectId || "general")}
-                title="Click to recheck Ollama status"
-                className="text-[11px] font-medium text-warning-400 hover:text-warning-300 flex items-center gap-1 transition-colors"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-warning-400" />
-                Ollama Offline (Retry)
-              </button>
-            )}
-          </div>
-
           {/* Project Selector */}
           <div className="flex items-center gap-1.5 bg-surface-950/70 px-2.5 py-1 rounded-lg border border-surface-800">
-            <label htmlFor="project-selector" className="text-[11px] font-bold text-surface-400 uppercase tracking-wider">
+            <label htmlFor="project-selector" className="text-[11px] font-semibold text-surface-400">
               Project:
             </label>
             <select
               id="project-selector"
-              className="bg-transparent text-surface-100 text-xs font-medium focus:outline-none cursor-pointer max-w-[150px] sm:max-w-[190px] truncate"
+              className="bg-transparent text-surface-100 text-xs font-medium focus:outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate"
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
               disabled={loadingProjects}
@@ -844,7 +865,7 @@ export default function AIContinuityPage() {
               {projects.length === 0 && <option value="">No projects available</option>}
               {projects.map((p) => (
                 <option key={p.id} value={p.id} className="bg-surface-900 text-surface-100">
-                  {p.name} ({p.status})
+                  {p.name}{p.status ? ` (${p.status})` : ""}
                 </option>
               ))}
             </select>
@@ -858,7 +879,7 @@ export default function AIContinuityPage() {
               className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-surface-300 hover:text-white bg-surface-800 hover:bg-surface-750 border border-surface-700 rounded-lg transition-colors shadow-sm"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>New Chat</span>
+              <span className="hidden sm:inline">New Chat</span>
             </button>
           )}
         </div>
@@ -866,13 +887,14 @@ export default function AIContinuityPage() {
 
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* Compact Project Intelligence Context Strip                         */}
+      {/* Only shown during active conversation or Dossier peek              */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {ctx?.project ? (
+      {ctx?.project && (activeTab === "dossier" || currentChatLog.length > 0) ? (
         <div className="px-4 py-2 bg-surface-900/60 border-b border-surface-800/80 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0 z-10">
           <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-surface-300">
             <span className="font-bold text-white flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-primary-400" />
-              <span>{ctx.project.name || currentProject?.name || "Alpha Project"}</span>
+              <span>{ctx.project.name || currentProject?.name || "Project"}</span>
             </span>
             <span className="text-surface-600 hidden sm:inline">|</span>
             <span className="px-2 py-0.5 rounded bg-surface-800 text-surface-200 font-semibold border border-surface-700/80 text-[11px]">
@@ -984,42 +1006,230 @@ export default function AIContinuityPage() {
               </div>
             )}
 
-            {/* Tasks and Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              <div className="p-3 bg-surface-950/70 rounded-xl border border-surface-800">
-                <h4 className="text-xs font-bold text-danger-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Attention Required ({attentionRequired.length})
-                </h4>
+            {/* The Four Handover Boxes (Preserved for Post-Interaction & Handover Review) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* BOX 1: What the Next Developer Should Know */}
+              <div className="p-4 bg-surface-950/70 rounded-xl border border-surface-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-surface-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-primary-400" />
+                    What the Next Developer Should Know
+                  </h4>
+                  <span className="text-[10px] text-surface-400 font-mono">Box 1 of 4</span>
+                </div>
+                <p className="text-[11px] text-surface-400">
+                  Key architectural context and priorities before taking over this project.
+                </p>
+                <ul className="space-y-1.5 text-xs text-surface-300">
+                  {whatDeveloperShouldKnow.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-primary-400 font-bold mt-0.5">•</span>
+                      <span className="leading-relaxed">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                {summary?.what_next_developer_should_know && summary.what_next_developer_should_know !== "N/A" && (
+                  <div className="p-2.5 rounded-lg bg-surface-900/90 border border-surface-800 text-xs text-surface-300 leading-relaxed mt-2">
+                    <strong className="block text-[11px] text-primary-300 uppercase font-semibold mb-1">AI Takeaway</strong>
+                    {summary.what_next_developer_should_know}
+                  </div>
+                )}
+              </div>
+
+              {/* BOX 2: Completed and Pending Work */}
+              <div className="p-4 bg-surface-950/70 rounded-xl border border-surface-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Completed and Pending Work
+                  </h4>
+                  <span className="text-[10px] text-surface-400 font-mono">Box 2 of 4</span>
+                </div>
+                <p className="text-[11px] text-surface-400">
+                  Verified deliverable status across in-flight, completed, and pending backlog tasks.
+                </p>
+
+                {/* In Progress */}
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-semibold text-primary-300 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-primary-400" />
+                    <span>Currently In Progress ({inProgressWork.length})</span>
+                  </div>
+                  {inProgressWork.length === 0 ? (
+                    <p className="text-xs text-surface-500 italic pl-4">No active work in progress.</p>
+                  ) : (
+                    <div className="space-y-1.5 pl-2 max-h-28 overflow-y-auto pr-1">
+                      {inProgressWork.map((t: any) => (
+                        <div key={t.id} className="p-2 bg-surface-900 rounded-lg border border-surface-800 text-xs flex items-center justify-between gap-2">
+                          <span className="font-semibold text-surface-200 truncate">{t.title}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-800 text-surface-400">{t.devName}</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary-500/20 text-primary-300">{t.priority}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Completed Work */}
+                <div className="space-y-1.5 pt-2 border-t border-surface-800/80">
+                  <div className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    <span>Completed Deliverables ({completedWork.length})</span>
+                  </div>
+                  {completedWork.length === 0 ? (
+                    <p className="text-xs text-surface-500 italic pl-4">No completed tasks yet.</p>
+                  ) : (
+                    <div className="space-y-1 pl-2 max-h-24 overflow-y-auto pr-1">
+                      {completedWork.slice(0, 3).map((t: any) => (
+                        <div key={t.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-surface-900/60">
+                          <span className="text-surface-300 truncate">{t.title}</span>
+                          <span className="text-[10px] text-emerald-400 font-semibold shrink-0">VERIFIED</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Pending Work */}
+                <div className="space-y-1.5 pt-2 border-t border-surface-800/80">
+                  <div className="text-[11px] font-semibold text-surface-300 flex items-center gap-1">
+                    <Layers className="w-3 h-3 text-surface-400" />
+                    <span>Pending Backlog ({pendingWork.length})</span>
+                  </div>
+                  {pendingWork.length === 0 ? (
+                    <p className="text-xs text-surface-500 italic pl-4">No pending backlog tasks.</p>
+                  ) : (
+                    <div className="space-y-1 pl-2 max-h-24 overflow-y-auto pr-1">
+                      {pendingWork.slice(0, 3).map((t: any) => (
+                        <div key={t.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-surface-900/60">
+                          <span className="text-surface-300 truncate">{t.title}</span>
+                          <span className="text-[10px] text-surface-400 shrink-0">{t.devName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* BOX 3: Items Requiring Attention */}
+              <div className="p-4 bg-surface-950/70 rounded-xl border border-surface-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-danger-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Items Requiring Attention ({attentionRequired.length})
+                  </h4>
+                  <span className="text-[10px] text-surface-400 font-mono">Box 3 of 4</span>
+                </div>
+                <p className="text-[11px] text-surface-400">
+                  Overdue tasks, stuck workflows, and active technical risks.
+                </p>
                 {attentionRequired.length === 0 ? (
-                  <p className="text-xs text-success-400 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> No overdue or blocked tasks recorded.
-                  </p>
+                  <div className="space-y-2 py-3">
+                    <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> No verified overdue tasks recorded.
+                    </p>
+                    <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> No verified stuck workflows recorded.
+                    </p>
+                  </div>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                     {attentionRequired.map((t: any) => (
-                      <div key={t.id} className="p-2 bg-surface-900 rounded-lg border border-surface-800 text-xs flex justify-between">
-                        <span className="font-semibold text-surface-200 truncate">{t.title}</span>
-                        <span className="text-danger-400 font-bold ml-2 shrink-0">{t.riskLabel}</span>
+                      <div key={t.id} className="p-2.5 bg-surface-900 rounded-lg border border-surface-800 text-xs space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-surface-200 truncate">{t.title}</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-danger-500/20 text-danger-300 shrink-0">
+                            {t.riskLabel}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-surface-400">
+                          <span>Assignee: {t.devName}</span>
+                          <span>•</span>
+                          <span>Priority: {t.priority}</span>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div className="p-3 bg-surface-950/70 rounded-xl border border-surface-800">
-                <h4 className="text-xs font-bold text-surface-200 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                  <Layers className="w-3.5 h-3.5 text-primary-400" />
-                  What the Next Developer Should Know
-                </h4>
-                <ul className="space-y-1 text-xs text-surface-300">
-                  {whatDeveloperShouldKnow.map((item, i) => (
-                    <li key={i} className="flex items-start gap-1.5">
-                      <span className="text-primary-400">•</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
+              {/* BOX 4: Recorded Tasks, GitHub Pull Requests, and Issues */}
+              <div className="p-4 bg-surface-950/70 rounded-xl border border-surface-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <GitBranch className="w-3.5 h-3.5" />
+                    Recorded Tasks, GitHub Pull Requests, and Issues
+                  </h4>
+                  <span className="text-[10px] text-surface-400 font-mono">Box 4 of 4</span>
+                </div>
+                <p className="text-[11px] text-surface-400">
+                  Telemetry linking DevFlow database records and GitHub activity.
+                </p>
+
+                {/* Repository & Verification */}
+                <div className="p-2.5 rounded-lg bg-surface-900 border border-surface-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-surface-400 font-medium">Repository:</span>
+                    <span className="font-mono text-cyan-400 truncate max-w-[200px]">
+                      {github?.repository || "Not Connected"}
+                    </span>
+                  </div>
+                  <div className="text-[11px] flex items-center gap-1.5">
+                    {hasVerifiedMappings ? (
+                      <span className="text-emerald-400 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> GitHub activities verified & mapped to tasks.
+                      </span>
+                    ) : (
+                      <span className="text-surface-400 flex items-center gap-1">
+                        <Info className="w-3 h-3 text-surface-500" /> Mappings updated from database.
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Open PRs */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold text-surface-300 block">
+                    Open Pull Requests ({unmappedPrs.length})
+                  </span>
+                  {unmappedPrs.length === 0 ? (
+                    <p className="text-xs text-surface-500 italic">No open pull requests recorded.</p>
+                  ) : (
+                    <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                      {unmappedPrs.slice(0, 3).map((pr: any, i: number) => (
+                        <div key={i} className="p-1.5 rounded bg-surface-900 text-xs flex items-center justify-between gap-2">
+                          <span className="text-surface-200 truncate">{pr.title}</span>
+                          <span className="text-[10px] text-cyan-400 shrink-0">{pr.author}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recent Commits */}
+                <div className="space-y-1.5 pt-2 border-t border-surface-800/80">
+                  <span className="text-[11px] font-semibold text-surface-300 block">
+                    Recent Commits ({unmappedCommits.length})
+                  </span>
+                  {unmappedCommits.length === 0 ? (
+                    <p className="text-xs text-surface-500 italic">No recent commits recorded.</p>
+                  ) : (
+                    <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                      {unmappedCommits.slice(0, 3).map((c: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between text-xs py-1 px-1.5 rounded bg-surface-900/60">
+                          <span className="text-surface-300 truncate max-w-[200px]">
+                            {c.message ? c.message.split("\n")[0] : "Commit"}
+                          </span>
+                          <span className="font-mono text-[10px] text-surface-500 shrink-0">
+                            {c.sha ? c.sha.substring(0, 7) : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1034,165 +1244,183 @@ export default function AIContinuityPage() {
           <span className="sr-only">AI Continuity Assistant</span>
 
           {/* Scrollable Message History & Welcome View */}
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 scroll-smooth flex flex-col min-h-0">
-            <div className={`max-w-3xl xl:max-w-4xl mx-auto w-full ${currentChatLog.length === 0 ? "my-auto flex flex-col items-center justify-center flex-1" : "space-y-6"}`}>
-              {/* INITIAL WELCOME SCREEN (Shown synchronously when there are no messages in current thread) */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-2 sm:py-3 scroll-smooth flex flex-col min-h-0">
+            <div className={`max-w-3xl xl:max-w-4xl mx-auto w-full flex-1 flex flex-col ${currentChatLog.length === 0 ? "justify-center" : "space-y-6"}`}>
+              {/* INITIAL WELCOME SCREEN (Rendered immediately from frontend on initial load) */}
               {currentChatLog.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center animate-fade-in space-y-3.5 max-w-3xl mx-auto w-full py-2 sm:py-3">
-                  {/* Glowing AI Star / Sparkle Symbol with complementary intelligence icon */}
-                  <div className="relative group mb-0.5">
-                    {/* Multi-layer subtle indigo/blue glow */}
-                    <div className="absolute -inset-2.5 bg-gradient-to-r from-primary-600 via-indigo-600 to-blue-500 rounded-3xl blur-xl opacity-35 group-hover:opacity-55 transition duration-500" />
-                    <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-primary-500 via-indigo-600 to-cyan-400 p-0.5 shadow-2xl shadow-indigo-500/30 flex items-center justify-center">
-                      <div className="w-full h-full bg-surface-950/95 backdrop-blur-md rounded-[14px] flex items-center justify-center relative overflow-hidden">
-                        <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-primary-400 animate-pulse drop-shadow-[0_0_12px_rgba(99,102,241,0.6)]" />
+                <div className="flex-1 flex flex-col items-center justify-center text-center animate-fade-in max-w-4xl mx-auto w-full px-2 py-4 my-auto select-none">
+                  {/* 1. Welcome Symbol, Heading, and Subtitle */}
+                  <div className="flex flex-col items-center mb-5">
+                    {/* Glowing AI Star / Sparkle Symbol with complementary intelligence circuit badge */}
+                    <div className="relative group mb-3">
+                      <div className="absolute -inset-2 bg-gradient-to-r from-primary-600/35 via-indigo-600/35 to-blue-500/30 rounded-2xl blur-xl opacity-60 group-hover:opacity-85 transition duration-500" />
+                      <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-primary-500 via-indigo-600 to-cyan-400 p-0.5 shadow-xl shadow-indigo-500/25 flex items-center justify-center">
+                        <div className="w-full h-full bg-surface-950/95 backdrop-blur-md rounded-[14px] flex items-center justify-center relative overflow-hidden">
+                          <Sparkles className="w-6 h-6 sm:w-7 sm:h-7 text-primary-300 drop-shadow-[0_0_12px_rgba(99,102,241,0.7)] animate-pulse" />
+                        </div>
+                      </div>
+                      <div
+                        className="absolute -bottom-1 -right-1 w-5 h-5 rounded-md bg-surface-900 border border-primary-500/40 shadow-lg flex items-center justify-center"
+                        title="AI Neural Intelligence Core"
+                      >
+                        <Cpu className="w-3 h-3 text-cyan-400" />
                       </div>
                     </div>
-                    {/* Complementary intelligence-themed badge */}
-                    <div
-                      className="absolute -bottom-1 -right-1 w-5 h-5 rounded-lg bg-surface-900 border border-primary-500/40 shadow-lg flex items-center justify-center"
-                      title="AI DevFlow Neural Core"
-                    >
-                      <Cpu className="w-3 h-3 text-cyan-400" />
-                    </div>
-                  </div>
 
-                  {/* Visual Focal Point: Heading & Polished Subtitle */}
-                  <div className="max-w-2xl px-4 space-y-1.5">
-                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight drop-shadow-sm">
+                    {/* Exact Main Heading & Subtitle */}
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight drop-shadow-sm leading-tight mb-1.5">
                       Your Project. Your Intelligence.
-                    </h2>
-                    <p className="text-xs sm:text-sm text-surface-400 max-w-lg mx-auto leading-relaxed">
+                    </h1>
+                    <p className="text-xs sm:text-sm text-surface-400 max-w-lg mx-auto leading-relaxed font-normal">
                       Your AI workspace for project understanding, development assistance, and intelligent handovers.
                     </p>
                   </div>
 
-                  {/* Clean Active Scope Pill */}
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-900/90 border border-surface-800 text-[11px] text-surface-300 shadow-inner">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-                    <span>
-                      Active Scope:{" "}
-                      <strong className="text-surface-100 font-semibold">
-                        {currentProject?.name || "General Intelligence"}
-                      </strong>
-                    </span>
+                  {/* 2. The Original Four Cards with Arrow/Chevron Marks */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full mb-4">
+                    {/* Card 1: Project Overview */}
+                    <button
+                      type="button"
+                      onClick={() => handleAsk("What is the current project status and overview?")}
+                      className="p-3.5 rounded-xl bg-surface-900/80 hover:bg-surface-850 border border-surface-800 hover:border-primary-500/40 text-left transition-all duration-200 group shadow-md hover:shadow-primary-500/10 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="w-7 h-7 rounded-lg bg-primary-600/15 border border-primary-500/20 flex items-center justify-center text-primary-400">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-surface-500 group-hover:text-primary-400 group-hover:translate-x-0.5 transition-all" />
+                        </div>
+                        <h3 className="text-xs font-bold text-surface-100 group-hover:text-primary-300 transition-colors uppercase tracking-wider mb-1">
+                          Project Overview
+                        </h3>
+                        <p className="text-[11px] text-surface-400 line-clamp-2 leading-relaxed">
+                          {summary?.project_overview ||
+                            `${ctx?.project?.name || currentProject?.name || "Project"} · ${
+                              ctx?.project?.progress !== undefined ? `${ctx.project.progress}% Complete` : "Verified Project Records"
+                            }`}
+                        </p>
+                      </div>
+                      <div className="mt-2.5 pt-2 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
+                        <span>Manager: {pmName}</span>
+                        <span className="text-primary-400 font-semibold group-hover:underline">Explore →</span>
+                      </div>
+                    </button>
+
+                    {/* Card 2: Previous Developer Work */}
+                    <button
+                      type="button"
+                      onClick={() => handleAsk("What did the previous developer complete?")}
+                      className="p-3.5 rounded-xl bg-surface-900/80 hover:bg-surface-850 border border-surface-800 hover:border-emerald-500/40 text-left transition-all duration-200 group shadow-md hover:shadow-emerald-500/10 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-600/15 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-surface-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+                        </div>
+                        <h3 className="text-xs font-bold text-surface-100 group-hover:text-emerald-300 transition-colors uppercase tracking-wider mb-1">
+                          Previous Developer Work
+                        </h3>
+                        <p className="text-[11px] text-surface-400 line-clamp-2 leading-relaxed">
+                          {summary?.previous_developer_work ||
+                            (completedWork.length > 0
+                              ? `${completedWork.length} completed deliverables: ${completedWork.map((t: any) => t.title).slice(0, 2).join(", ")}`
+                              : "Verified historical task completions and architecture milestones.")}
+                        </p>
+                      </div>
+                      <div className="mt-2.5 pt-2 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
+                        <span>{completedWork.length} Completed</span>
+                        <span className="text-emerald-400 font-semibold group-hover:underline">Explore →</span>
+                      </div>
+                    </button>
+
+                    {/* Card 3: Current Work */}
+                    <button
+                      type="button"
+                      onClick={() => handleAsk("What is the current work in progress and active team focus?")}
+                      className="p-3.5 rounded-xl bg-surface-900/80 hover:bg-surface-850 border border-surface-800 hover:border-amber-500/40 text-left transition-all duration-200 group shadow-md hover:shadow-amber-500/10 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="w-7 h-7 rounded-lg bg-amber-600/15 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                            <Clock className="w-4 h-4" />
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-surface-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
+                        </div>
+                        <h3 className="text-xs font-bold text-surface-100 group-hover:text-amber-300 transition-colors uppercase tracking-wider mb-1">
+                          Current Work
+                        </h3>
+                        <p className="text-[11px] text-surface-400 line-clamp-2 leading-relaxed">
+                          {summary?.current_work ||
+                            (activeFocusTask
+                              ? `Focus: "${activeFocusTask.title}" (${activeFocusTask.priority || "Standard"}) assigned to ${activeFocusTask.devName}.`
+                              : `${inProgressWork.length} active task(s) currently in flight.`)}
+                        </p>
+                      </div>
+                      <div className="mt-2.5 pt-2 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
+                        <span>{inProgressWork.length} In Progress</span>
+                        <span className="text-amber-400 font-semibold group-hover:underline">Explore →</span>
+                      </div>
+                    </button>
+
+                    {/* Card 4: Pending Work */}
+                    <button
+                      type="button"
+                      onClick={() => handleAsk("What work is still pending and which tasks have been pending for a long time?")}
+                      className="p-3.5 rounded-xl bg-surface-900/80 hover:bg-surface-850 border border-surface-800 hover:border-indigo-500/40 text-left transition-all duration-200 group shadow-md hover:shadow-indigo-500/10 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-600/15 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                            <AlertTriangle className="w-4 h-4" />
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-surface-500 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
+                        </div>
+                        <h3 className="text-xs font-bold text-surface-100 group-hover:text-indigo-300 transition-colors uppercase tracking-wider mb-1">
+                          Pending Work
+                        </h3>
+                        <p className="text-[11px] text-surface-400 line-clamp-2 leading-relaxed">
+                          {summary?.pending_work ||
+                            (pendingAgeInfo
+                              ? `${pendingWork.length} pending task(s). Incomplete for ${pendingAgeInfo.durationStr} (${pendingAgeInfo.oldestTitle}).`
+                              : `${pendingWork.length} task(s) pending in backlog queue.`)}
+                        </p>
+                      </div>
+                      <div className="mt-2.5 pt-2 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
+                        <span>{pendingAgeInfo ? `Incomplete for ${pendingAgeInfo.durationStr}` : `${pendingWork.length} Pending`}</span>
+                        <span className="text-indigo-400 font-semibold group-hover:underline">Explore →</span>
+                      </div>
+                    </button>
                   </div>
 
-                  {/* Four Compact Feature Boxes (2x2 grid on laptop screens) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 w-full max-w-3xl px-2 text-left pt-1">
-                    {/* 1. Handover Intelligence */}
-                    <button
-                      type="button"
-                      id="feature-box-handover-intelligence"
-                      onClick={() => {
-                        setActiveTab("dossier");
-                        if (!summary && selectedProjectId) {
-                          handleGenerate();
-                        }
-                      }}
-                      className="p-3 rounded-xl bg-surface-900/70 hover:bg-surface-850/95 border border-surface-800/90 hover:border-indigo-500/50 shadow-sm hover:shadow-indigo-500/10 transition-all duration-200 group text-left flex items-start gap-3 cursor-pointer"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 group-hover:bg-indigo-500/20 group-hover:scale-105 transition-all mt-0.5">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <span className="text-xs sm:text-sm font-bold text-white group-hover:text-indigo-300 transition-colors truncate">
-                            Handover Intelligence
-                          </span>
-                          <span className="text-[10px] font-semibold text-indigo-400/90 bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.2 rounded-full shrink-0">
-                            Dossier
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-surface-400 leading-snug line-clamp-2">
-                          Generate or review a project handover using verified project information.
-                        </p>
-                      </div>
-                    </button>
-
-                    {/* 2. Project Understanding */}
-                    <button
-                      type="button"
-                      id="feature-box-project-understanding"
-                      disabled={asking}
-                      onClick={() => {
-                        handleAsk("Provide a comprehensive overview of this project's architecture, scope, and current status based on available records.");
-                      }}
-                      className="p-3 rounded-xl bg-surface-900/70 hover:bg-surface-850/95 border border-surface-800/90 hover:border-sky-500/50 shadow-sm hover:shadow-sky-500/10 transition-all duration-200 group text-left flex items-start gap-3 cursor-pointer disabled:opacity-50"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 group-hover:bg-sky-500/20 group-hover:scale-105 transition-all mt-0.5">
-                        <Bot className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <span className="text-xs sm:text-sm font-bold text-white group-hover:text-sky-300 transition-colors truncate">
-                            Project Understanding
-                          </span>
-                          <span className="text-[10px] font-semibold text-sky-400/90 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.2 rounded-full shrink-0">
-                            Records
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-surface-400 leading-snug line-clamp-2">
-                          Ask questions about the selected project using available project records.
-                        </p>
-                      </div>
-                    </button>
-
-                    {/* 3. Development Assistant */}
-                    <button
-                      type="button"
-                      id="feature-box-development-assistant"
-                      disabled={asking}
-                      onClick={() => {
-                        handleAsk("How can you assist me with programming, debugging, and development questions for this project?");
-                      }}
-                      className="p-3 rounded-xl bg-surface-900/70 hover:bg-surface-850/95 border border-surface-800/90 hover:border-emerald-500/50 shadow-sm hover:shadow-emerald-500/10 transition-all duration-200 group text-left flex items-start gap-3 cursor-pointer disabled:opacity-50"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 group-hover:bg-emerald-500/20 group-hover:scale-105 transition-all mt-0.5">
-                        <Terminal className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <span className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-300 transition-colors truncate">
-                            Development Assistant
-                          </span>
-                          <span className="text-[10px] font-semibold text-emerald-400/90 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded-full shrink-0">
-                            Code & Debug
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-surface-400 leading-snug line-clamp-2">
-                          Get help with programming, debugging, and development questions.
-                        </p>
-                      </div>
-                    </button>
-
-                    {/* 4. Workflow Intelligence */}
-                    <button
-                      type="button"
-                      id="feature-box-workflow-intelligence"
-                      disabled={asking}
-                      onClick={() => {
-                        handleAsk("Summarize current task progress, dependencies, team activity, and verified blockers for this project.");
-                      }}
-                      className="p-3 rounded-xl bg-surface-900/70 hover:bg-surface-850/95 border border-surface-800/90 hover:border-amber-500/50 shadow-sm hover:shadow-amber-500/10 transition-all duration-200 group text-left flex items-start gap-3 cursor-pointer disabled:opacity-50"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 group-hover:bg-amber-500/20 group-hover:scale-105 transition-all mt-0.5">
-                        <GitBranch className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <span className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-300 transition-colors truncate">
-                            Workflow Intelligence
-                          </span>
-                          <span className="text-[10px] font-semibold text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 rounded-full shrink-0">
-                            Telemetry
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-surface-400 leading-snug line-clamp-2">
-                          Understand task progress, dependencies, activity, and verified blockers.
-                        </p>
-                      </div>
-                    </button>
+                  {/* 3. Original Suggested Questions Chips */}
+                  <div className="w-full space-y-2 pt-1 mb-1">
+                    <div className="text-[11px] font-bold text-surface-400 uppercase tracking-wider text-center">
+                      Suggested Questions
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {[
+                        "What is the current project status?",
+                        "What work is still pending?",
+                        "What did the previous developer complete?",
+                        "Which tasks have been pending for a long time?",
+                        "What should the next developer do first?",
+                        "What are the current project risks?",
+                      ].map((q, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleAsk(q)}
+                          disabled={asking}
+                          className="text-xs px-3.5 py-1.5 rounded-full bg-surface-900/90 hover:bg-surface-800 text-surface-300 hover:text-white border border-surface-700/80 hover:border-primary-500/50 transition-all shadow-sm flex items-center gap-1.5 group disabled:opacity-50"
+                        >
+                          <span className="text-primary-400 group-hover:scale-110 transition-transform">💬</span>
+                          <span>{q}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1219,7 +1447,7 @@ export default function AIContinuityPage() {
                         msg.role === "user"
                           ? "bg-primary-600 text-white rounded-tr-sm p-4 border border-primary-500/40"
                           : msg.isError
-                          ? "bg-danger-950/40 text-danger-200 border border-danger-500/40 rounded-tl-sm p-4"
+                          ? "bg-danger-950/40 text-danger-200 border border-danger-500/40 rounded-tl-sm p-4 sm:p-5"
                           : "bg-surface-900/95 text-surface-100 border border-surface-800/90 rounded-tl-sm p-5"
                       }`}
                     >
@@ -1227,7 +1455,61 @@ export default function AIContinuityPage() {
                         <p className="whitespace-pre-wrap break-words text-sm leading-relaxed font-normal">
                           {msg.text}
                         </p>
-                      ) : msg.text === "" && !msg.isError ? (
+                      ) : msg.isError ? (
+                        <div className="space-y-3">
+                          <div className="flex items-start gap-2.5">
+                            <div className="p-1.5 rounded-lg bg-danger-500/20 text-danger-400 shrink-0 mt-0.5">
+                              <AlertTriangle className="w-4 h-4" />
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-xs font-semibold text-danger-200 tracking-wide uppercase">
+                                AI Service Notice
+                              </h4>
+                              <p className="text-sm text-surface-200 leading-relaxed font-normal">
+                                {msg.text.replace(/^⚠️\s*/, "")}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Collapsible Diagnostic Details */}
+                          <div className="pt-2 border-t border-danger-500/20">
+                            <button
+                              type="button"
+                              onClick={() => setShowDiagnostics((prev) => !prev)}
+                              className="text-[11px] text-surface-400 hover:text-surface-200 flex items-center gap-1 transition-colors"
+                            >
+                              {showDiagnostics ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              <span>{showDiagnostics ? "Hide diagnostic details" : "View technical diagnostics"}</span>
+                            </button>
+
+                            {showDiagnostics && (
+                              <div className="mt-2 p-2.5 rounded-lg bg-surface-950/80 border border-surface-800/80 text-[11px] font-mono text-surface-300 space-y-1">
+                                <div className="flex justify-between">
+                                  <span className="text-surface-400">Provider:</span>
+                                  <span className="text-surface-200 font-semibold">{aiStatus?.provider || "ollama"}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-surface-400">Target Model:</span>
+                                  <span className="text-surface-200 font-semibold">{aiStatus?.model || "llama3.2:1b"}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-surface-400">Daemon Endpoint:</span>
+                                  <span className="text-surface-200 font-semibold">http://localhost:11434</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-surface-400">Status:</span>
+                                  <span className="text-amber-400 font-semibold">{aiStatus?.status || "unavailable"}</span>
+                                </div>
+                                {(aiStatus?.error || aiStatus?.health?.error) && (
+                                  <div className="pt-1 text-danger-400 text-[10px] break-all border-t border-surface-800">
+                                    {aiStatus.error || aiStatus.health?.error}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : msg.text === "" ? (
                         <div className="flex items-center gap-2 py-1 text-surface-400 text-xs">
                           <span className="w-2 h-2 rounded-full bg-primary-400 animate-ping" />
                           <span>DevFlow AI is thinking...</span>
@@ -1278,11 +1560,14 @@ export default function AIContinuityPage() {
 
                       {/* Recoverable Retry on Failure */}
                       {msg.isError && lastFailedQuestion && (
-                        <div className="mt-3 pt-2 border-t border-danger-500/20 flex justify-end">
+                        <div className="mt-3 pt-2.5 border-t border-danger-500/20 flex items-center justify-between gap-3">
+                          <span className="text-[11px] text-surface-400">
+                            Need this answered?
+                          </span>
                           <button
                             onClick={() => handleAsk(lastFailedQuestion)}
                             disabled={asking}
-                            className="px-3 py-1 bg-danger-500/20 hover:bg-danger-500/30 text-danger-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-danger-500/30"
+                            className="px-3 py-1 bg-danger-500/20 hover:bg-danger-500/30 text-danger-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border border-danger-500/30 disabled:opacity-50"
                           >
                             <RotateCcw className="w-3 h-3" /> Retry Question
                           </button>
@@ -1298,6 +1583,41 @@ export default function AIContinuityPage() {
                     )}
                   </div>
                 ))
+              )}
+
+              {/* Post-Interaction: 4 Handover Boxes Quick Access Strip */}
+              {currentChatLog.length > 0 && (
+                <div className="pt-3 pb-1 border-t border-surface-800/80">
+                  <div className="p-3.5 rounded-xl bg-surface-900/60 border border-surface-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-primary-600/20 border border-primary-500/30 flex items-center justify-center text-primary-400 shrink-0">
+                        <Layers className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-surface-200 flex items-center gap-2">
+                          <span>Project Handover Intelligence</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] bg-surface-800 text-primary-300 border border-surface-700">
+                            4 Handover Boxes
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-surface-400">
+                          Developer takeaways, completed & pending tasks, attention items, and GitHub telemetry.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowContextDrawer((prev) => !prev)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-800 hover:bg-surface-700 text-primary-300 border border-surface-700 flex items-center gap-1.5 transition-colors shadow-sm"
+                      >
+                        <Layers className="w-3.5 h-3.5" />
+                        <span>{showContextDrawer ? "Hide Handover Boxes" : "View 4 Handover Boxes"}</span>
+                        {showContextDrawer ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
 
               <div ref={messagesEndRef} />

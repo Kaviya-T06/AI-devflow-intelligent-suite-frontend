@@ -244,6 +244,7 @@ export interface AIStatusResponse {
     installed_models?: string[];
     error?: string;
   };
+  error?: string;
 }
 
 export async function getContinuityAiStatus(projectId: string, token: string): Promise<AIStatusResponse> {

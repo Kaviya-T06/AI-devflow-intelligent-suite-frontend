@@ -149,8 +149,8 @@ export default function App() {
                 />
               </Route>
 
-              {/* PM-only AI Continuity module */}
-              <Route element={<RoleRoute allowedRoles={["MANAGER"]} />}>
+              {/* PM and Admin AI Continuity module */}
+              <Route element={<RoleRoute allowedRoles={["MANAGER", "ADMIN"]} />}>
                 <Route
                   path="/dashboard/pm-ai-continuity"
                   element={<AIContinuityPage />}

@@ -97,6 +97,7 @@ describe("AIContinuityPage", () => {
       health: { available: true, model_installed: true },
     });
     (continuityService.getContinuityDataBriefing as any).mockResolvedValue(mockBriefing);
+    (continuityService.generateContinuitySummary as any).mockResolvedValue(mockBriefing);
     (continuityService.streamContinuityQuestion as any).mockImplementation(
       async (_projectId: string, _q: string, _t: string, _h: any, onChunk: any) => {
         const ans = "Based on verified project records, Charlie is working on the Telemetry engine.";
@@ -119,7 +120,7 @@ describe("AIContinuityPage", () => {
   it("renders the AI Continuity Page title and project selector", async () => {
     renderComponent();
 
-    expect(screen.getByText(/AI Project Summary & Continuity/i)).toBeInTheDocument();
+    expect(screen.getByText("AI Continuity")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText("Alpha Project (active)")).toBeInTheDocument();
@@ -186,18 +187,25 @@ describe("AIContinuityPage", () => {
     });
   });
 
-  it("displays project metrics and verified tasks from the briefing", async () => {
+  it("displays project metrics and verified tasks in the Handover Dossier view", async () => {
     renderComponent();
 
     await waitFor(() => {
       expect(screen.getAllByText(/Alpha Project/i).length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText(/65% Complete/i)).toBeInTheDocument();
-      expect(screen.getByText(/PM Alice/i)).toBeInTheDocument();
-      expect(screen.getByText("Telemetry engine")).toBeInTheDocument();
+    });
+
+    const dossierTabBtn = screen.getByText("Handover Dossier");
+    fireEvent.click(dossierTabBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Section A: Project Overview & Scope/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/65% Complete/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/PM Alice/i).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Telemetry engine").length).toBeGreaterThanOrEqual(1);
     });
   });
 
-  it("renders the clean welcome screen with Your Project. Your Intelligence. heading and no suggestion cards", async () => {
+  it("renders the welcome screen with Your Project. Your Intelligence. heading, original 4 cards, and suggested questions", async () => {
     renderComponent();
 
     expect(screen.getByText("Your Project. Your Intelligence.")).toBeInTheDocument();
@@ -205,9 +213,19 @@ describe("AIContinuityPage", () => {
       screen.getByText("Your AI workspace for project understanding, development assistance, and intelligent handovers.")
     ).toBeInTheDocument();
 
-    // Verify negative requirement: No suggestion cards on initial welcome screen
-    expect(screen.queryByText("Suggested Questions")).not.toBeInTheDocument();
-    expect(screen.queryByText("Generate a project handover.")).not.toBeInTheDocument();
+    // Verify 4 original cards
+    expect(screen.getByText("Project Overview")).toBeInTheDocument();
+    expect(screen.getByText("Previous Developer Work")).toBeInTheDocument();
+    expect(screen.getByText("Current Work")).toBeInTheDocument();
+    expect(screen.getByText("Pending Work")).toBeInTheDocument();
+
+    // Verify suggested questions chips
+    expect(screen.getByText("Suggested Questions")).toBeInTheDocument();
+    expect(screen.getByText("What is the current project status?")).toBeInTheDocument();
+    expect(screen.getByText("What work is still pending?")).toBeInTheDocument();
+    expect(screen.getByText("What did the previous developer complete?")).toBeInTheDocument();
+    expect(screen.getByText("Which tasks have been pending for a long time?")).toBeInTheDocument();
+    expect(screen.getByText("What should the next developer do first?")).toBeInTheDocument();
   });
 
   it("switches to the Handover Dossier view and renders sections and context editor", async () => {
@@ -236,49 +254,40 @@ describe("AIContinuityPage", () => {
     expect(screen.getByText("Project Description & Objectives")).toBeInTheDocument();
   });
 
-  it("renders the AI star symbol, heading, and the four feature boxes on the initial welcome screen", async () => {
-    renderComponent();
-
-    // Verify Welcome Hero heading & subtitle
-    expect(screen.getByText("Your Project. Your Intelligence.")).toBeInTheDocument();
-    expect(
-      screen.getByText("Your AI workspace for project understanding, development assistance, and intelligent handovers.")
-    ).toBeInTheDocument();
-
-    // Verify the four feature boxes
-    expect(screen.getByText("Handover Intelligence")).toBeInTheDocument();
-    expect(
-      screen.getByText("Generate or review a project handover using verified project information.")
-    ).toBeInTheDocument();
-
-    expect(screen.getByText("Project Understanding")).toBeInTheDocument();
-    expect(
-      screen.getByText("Ask questions about the selected project using available project records.")
-    ).toBeInTheDocument();
-
-    expect(screen.getByText("Development Assistant")).toBeInTheDocument();
-    expect(
-      screen.getByText("Get help with programming, debugging, and development questions.")
-    ).toBeInTheDocument();
-
-    expect(screen.getByText("Workflow Intelligence")).toBeInTheDocument();
-    expect(
-      screen.getByText("Understand task progress, dependencies, activity, and verified blockers.")
-    ).toBeInTheDocument();
-
-    // Negative requirement: Old suggested-question cards row is NOT on the initial welcome screen
-    expect(screen.queryByText("Suggested Questions")).not.toBeInTheDocument();
-  });
-
-  it("clicking Handover Intelligence box switches to the Handover Dossier view", async () => {
+  it("clicking a suggested question chip submits the question through the chat flow", async () => {
     renderComponent();
 
     await waitFor(() => {
       expect(screen.getByText("Alpha Project (active)")).toBeInTheDocument();
     });
 
-    const handoverBox = document.getElementById("feature-box-handover-intelligence")!;
-    fireEvent.click(handoverBox);
+    const questionChip = screen.getByText("What is the current project status?");
+    fireEvent.click(questionChip);
+
+    await waitFor(() => {
+      expect(screen.getByText("What is the current project status?")).toBeInTheDocument();
+      expect(screen.getByText(/Charlie is working on the Telemetry engine/i)).toBeInTheDocument();
+    });
+
+    expect(continuityService.streamContinuityQuestion).toHaveBeenCalledWith(
+      "proj-1",
+      "What is the current project status?",
+      expect.any(String),
+      expect.any(Array),
+      expect.any(Function),
+      expect.any(Object)
+    );
+  });
+
+  it("clicking Handover Dossier tab switches to the Handover Dossier view", async () => {
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText("Alpha Project (active)")).toBeInTheDocument();
+    });
+
+    const dossierTab = screen.getByText("Handover Dossier");
+    fireEvent.click(dossierTab);
 
     await waitFor(() => {
       expect(screen.getByText(/Section A: Project Overview & Scope/i)).toBeInTheDocument();
@@ -286,19 +295,21 @@ describe("AIContinuityPage", () => {
     });
   });
 
-  it("clicking Project Understanding box triggers AI query and transitions to active conversation", async () => {
+  it("submitting a question transitions from welcome screen to active conversation", async () => {
     renderComponent();
 
     await waitFor(() => {
       expect(screen.getByText("Alpha Project (active)")).toBeInTheDocument();
     });
 
-    const understandingBox = document.getElementById("feature-box-project-understanding")!;
-    fireEvent.click(understandingBox);
+    const textarea = screen.getByPlaceholderText(/Ask about tasks, risks, PRs/i);
+    fireEvent.change(textarea, { target: { value: "Provide a comprehensive overview of this project's architecture" } });
+    const sendBtn = screen.getByLabelText("Send question");
+    fireEvent.click(sendBtn);
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Provide a comprehensive overview of this project's architecture/i)
+        screen.getByText("Provide a comprehensive overview of this project's architecture")
       ).toBeInTheDocument();
       expect(screen.getByText(/Charlie is working on the Telemetry engine/i)).toBeInTheDocument();
     });
@@ -313,7 +324,7 @@ describe("AIContinuityPage", () => {
     );
   });
 
-  it("clicking New Chat clears the conversation and restores the welcome screen with four boxes", async () => {
+  it("clicking New Chat clears the conversation and restores the clean welcome screen", async () => {
     renderComponent();
 
     await waitFor(() => {
@@ -331,20 +342,55 @@ describe("AIContinuityPage", () => {
       expect(screen.getByText("Tell me about this project")).toBeInTheDocument();
     });
 
-    // Feature boxes are hidden during active conversation
-    expect(screen.queryByText("Handover Intelligence")).not.toBeInTheDocument();
-
     // Click New Chat to clear
     const newChatBtn = screen.getByText("New Chat");
     fireEvent.click(newChatBtn);
 
-    // Welcome hero and four boxes reappear cleanly
+    // Welcome hero reappears cleanly
     await waitFor(() => {
       expect(screen.getByText("Your Project. Your Intelligence.")).toBeInTheDocument();
-      expect(screen.getByText("Handover Intelligence")).toBeInTheDocument();
-      expect(screen.getByText("Project Understanding")).toBeInTheDocument();
-      expect(screen.getByText("Development Assistant")).toBeInTheDocument();
-      expect(screen.getByText("Workflow Intelligence")).toBeInTheDocument();
+      expect(
+        screen.getByText("Your AI workspace for project understanding, development assistance, and intelligent handovers.")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("hides the four handover boxes on the initial screen and makes them accessible post-interaction", async () => {
+    renderComponent();
+
+    // Acceptance criteria 1 & 2: Welcome hero only, four boxes NOT visible initially
+    expect(screen.getByText("Your Project. Your Intelligence.")).toBeInTheDocument();
+    expect(screen.queryByText("Box 1 of 4")).not.toBeInTheDocument();
+    expect(screen.queryByText("Box 2 of 4")).not.toBeInTheDocument();
+    expect(screen.queryByText("Box 3 of 4")).not.toBeInTheDocument();
+    expect(screen.queryByText("Box 4 of 4")).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText("Alpha Project (active)")).toBeInTheDocument();
+    });
+
+    // Acceptance criteria 3: Start interacting with chat
+    const textarea = screen.getByPlaceholderText(/Ask about tasks, risks, PRs/i);
+    fireEvent.change(textarea, { target: { value: "What should I know before starting work?" } });
+    const sendBtn = screen.getByLabelText("Send question");
+    fireEvent.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText("What should I know before starting work?")).toBeInTheDocument();
+      expect(screen.getByText(/Charlie is working on the Telemetry engine/i)).toBeInTheDocument();
+    });
+
+    // Acceptance criteria 4: The 4 handover boxes remain accessible post-interaction
+    expect(screen.getByText("4 Handover Boxes")).toBeInTheDocument();
+    const viewBoxesBtn = screen.getByText("View 4 Handover Boxes");
+    fireEvent.click(viewBoxesBtn);
+
+    // Verify all 4 boxes are rendered with full project data
+    await waitFor(() => {
+      expect(screen.getByText("What the Next Developer Should Know")).toBeInTheDocument();
+      expect(screen.getByText("Completed and Pending Work")).toBeInTheDocument();
+      expect(screen.getByText(/Items Requiring Attention/i)).toBeInTheDocument();
+      expect(screen.getByText("Recorded Tasks, GitHub Pull Requests, and Issues")).toBeInTheDocument();
     });
   });
 });
