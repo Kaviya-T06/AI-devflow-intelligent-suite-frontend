@@ -39,6 +39,8 @@ import PMPendingReviewsPage from "./pages/dashboard/PMPendingReviewsPage";
 import DeveloperWorkflowRisksPage from "./pages/dashboard/DeveloperWorkflowRisksPage";
 import AIContinuityPage from "./pages/dashboard/AIContinuityPage";
 import ProjectDetailPage from "./pages/dashboard/ProjectDetailPage";
+import TeamPresencePage from "./pages/dashboard/TeamPresencePage";
+import { PresenceProvider } from "./context/PresenceContext";
 import { useAuth } from "./context/AuthContext";
 import LoadingScreen from "./components/ui/LoadingScreen";
 
@@ -60,6 +62,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <PresenceProvider>
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
@@ -189,7 +192,8 @@ export default function App() {
                 path="/dashboard/bottlenecks"
                 element={<ComingSoonPage />}
               />
-              <Route path="/dashboard/team" element={<ComingSoonPage />} />
+              <Route path="/dashboard/team-presence" element={<TeamPresencePage />} />
+              <Route path="/dashboard/team" element={<TeamPresencePage />} />
               <Route path="/dashboard/history" element={<ComingSoonPage />} />
               <Route
                 path="/dashboard/ai-insights"
@@ -202,6 +206,7 @@ export default function App() {
           <Route path="/" element={<RootRoute />} />
           <Route path="*" element={<RootRoute />} />
         </Routes>
+        </PresenceProvider>
       </AuthProvider>
     </BrowserRouter>
   );

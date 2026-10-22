@@ -550,4 +550,51 @@ export interface NotificationListResponse {
   total: number;
 }
 
+// ---------------------------------------------------------------------------
+// User Presence & Availability
+// ---------------------------------------------------------------------------
 
+export type AvailabilityStatus =
+  | 'available'
+  | 'busy'
+  | 'do_not_disturb'
+  | 'away'
+  | 'offline';
+
+export interface PresenceData {
+  user_id: string;
+  user_name?: string | null;
+  user_email?: string | null;
+  user_role?: string | null;
+  availability_status: AvailabilityStatus;
+  status_message?: string | null;
+  status_expires_at?: string | null;
+  last_seen_at: string;
+  is_online: boolean;
+  effective_status: AvailabilityStatus;
+  updated_at: string;
+}
+
+export interface PresenceUpdatePayload {
+  availability_status?: AvailabilityStatus;
+  status_message?: string | null;
+  status_expires_at?: string | null;
+  clear_expiry?: boolean;
+}
+
+export interface HeartbeatResponse {
+  status: string;
+  last_seen_at: string;
+  is_online: boolean;
+  availability_status: AvailabilityStatus;
+  effective_status: string;
+  status_expires_at?: string | null;
+}
+
+export interface TeamPresenceResponse {
+  users: PresenceData[];
+  total: number;
+  online_count: number;
+  available_count: number;
+  busy_count: number;
+}

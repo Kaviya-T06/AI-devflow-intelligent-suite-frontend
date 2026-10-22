@@ -8,8 +8,11 @@ import { fetchPendingReviews } from "../../services/taskSubmissionService";
 import { fetchAllProjects } from "../../services/adminService";
 import type { PendingReviewTask, Project } from "../../types";
 import TaskReviewModal from "../../components/dashboard/TaskReviewModal";
+import { usePresence } from "../../context/PresenceContext";
+import StatusDot from "../../components/presence/StatusDot";
 
 export default function PMPendingReviewsPage() {
+  const { getUserPresence } = usePresence();
   const [pendingTasks, setPendingTasks] = useState<PendingReviewTask[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("ALL");
@@ -172,9 +175,14 @@ export default function PMPendingReviewsPage() {
                     </td>
 
                     <td className="px-5 py-4">
-                      <span className="text-surface-200 font-medium block">
-                        {t.developer_name || "Unassigned"}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {t.developer_id && (
+                          <StatusDot presence={getUserPresence(t.developer_id)} size="xs" />
+                        )}
+                        <span className="text-surface-200 font-medium block">
+                          {t.developer_name || "Unassigned"}
+                        </span>
+                      </div>
                       {t.developer_email && (
                         <span className="text-surface-500 text-[11px]">
                           {t.developer_email}

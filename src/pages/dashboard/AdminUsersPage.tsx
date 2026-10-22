@@ -14,6 +14,9 @@ import {
 } from "../../services/adminService";
 import { useAuth } from "../../context/AuthContext";
 import Modal from "../../components/ui/Modal";
+import { usePresence } from "../../context/PresenceContext";
+import StatusDot from "../../components/presence/StatusDot";
+import UserStatusBadge from "../../components/presence/StatusBadge";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -252,6 +255,7 @@ function ConfirmDeleteModal({
 
 export default function AdminUsersPage() {
   const { user: currentUser } = useAuth();
+  const { getUserPresence } = usePresence();
 
   const [users, setUsers]       = useState<UserRecord[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -509,6 +513,7 @@ export default function AdminUsersPage() {
                   <th className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Email</th>
                   <th className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Role</th>
                   <th className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Status</th>
+                  <th className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Presence</th>
                   <th className="text-left text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Created</th>
                   <th className="text-right text-xs font-semibold text-surface-400 uppercase tracking-wider px-6 py-4">Actions</th>
                 </tr>
@@ -524,8 +529,15 @@ export default function AdminUsersPage() {
                       {/* Name */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
-                            {user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                          <div className="relative shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-xs">
+                              {user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
+                            </div>
+                            <StatusDot
+                              presence={getUserPresence(user.id)}
+                              size="xs"
+                              className="absolute -bottom-0.5 -right-0.5 border border-surface-900"
+                            />
                           </div>
                           <div>
                             <p className="text-surface-200 font-medium text-sm">{user.name}</p>
@@ -545,6 +557,18 @@ export default function AdminUsersPage() {
                       {/* Status */}
                       <td className="px-6 py-4">
                         <StatusBadge active={user.is_active} />
+                      </td>
+
+                      {/* Presence */}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-0.5">
+                          <UserStatusBadge status={getUserPresence(user.id)?.effective_status ?? "offline"} />
+                          {getUserPresence(user.id)?.status_message && (
+                            <span className="text-[11px] text-surface-500 italic truncate max-w-[140px]" title={getUserPresence(user.id)?.status_message ?? undefined}>
+                              "{getUserPresence(user.id)?.status_message}"
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Created */}
