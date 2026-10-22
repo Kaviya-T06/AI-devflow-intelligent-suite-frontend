@@ -541,6 +541,7 @@ export interface Notification {
   project_id: string | null;
   task_id: string | null;
   is_read: boolean;
+  read_at?: string | null;
   created_at: string;
 }
 

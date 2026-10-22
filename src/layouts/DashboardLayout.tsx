@@ -413,7 +413,7 @@ export const ALL_NAV_ITEMS: NavItem[] = [
     label: "AI Insights",
     path: "/dashboard/ai-insights",
     available: false,
-    roles: ["MANAGER"],
+    roles: [],
     icon: <AIIcon />,
   },
 ];
@@ -445,7 +445,6 @@ export const ROLE_NAV_ORDER: Record<UserRole, string[]> = {
     "pm-ai-continuity",
     "analytics",
     "notifications",
-    "ai-insights",
   ],
   DEVELOPER: [
     "dashboard",
@@ -650,17 +649,21 @@ function Sidebar({
           })}
         </nav>
 
-        {/* User profile */}
-        <div className="border-t border-surface-700/50 p-3">
+        {/* User profile & presence section */}
+        <div className="border-t border-surface-700/50 p-2 space-y-1 shrink-0 bg-surface-900/50">
           <NavLink
             to="/dashboard/profile"
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 ${isActive ? "bg-primary-500/15 border border-primary-500/20" : "hover:bg-surface-700/50"}`
+              `flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors ${
+                isActive
+                  ? "bg-primary-500/15 border border-primary-500/20"
+                  : "hover:bg-surface-800/60"
+              }`
             }
             onClick={onClose}
           >
             <div className="relative shrink-0">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-sm">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-semibold text-xs">
                 {initials}
               </div>
               {/* Online presence indicator dot on avatar */}
@@ -670,23 +673,20 @@ function Sidebar({
                 className="absolute -bottom-0.5 -right-0.5 border-2 border-surface-900"
               />
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-surface-200 text-sm font-medium truncate">
+            <div className="min-w-0 flex-1 flex items-center justify-between gap-1">
+              <p className="text-surface-200 text-xs font-medium truncate">
                 {displayName || "Admin"}
               </p>
-              <p className="text-surface-500 text-xs truncate">
-                {displayEmail}
-              </p>
+              {(profile?.role || role) && (
+                <span className="scale-90 origin-right shrink-0">
+                  <RoleBadge role={profile?.role || role} />
+                </span>
+              )}
             </div>
           </NavLink>
-          {(profile?.role || role) && (
-            <div className="px-3 pb-1 pt-0.5">
-              <RoleBadge role={profile?.role || role} />
-            </div>
-          )}
 
-          {/* Status selector */}
-          <div className="px-2 py-1">
+          {/* Status selector - compact dropdown near bottom */}
+          <div className="pt-0.5">
             <StatusSelector
               myPresence={myPresence}
               loading={presenceLoading}
@@ -697,10 +697,11 @@ function Sidebar({
             />
           </div>
 
+          {/* Team Presence compact navigation item with minimal vertical padding */}
           <NavLink
             to="/dashboard/team-presence"
             className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              `flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 isActive
                   ? "bg-primary-500/15 text-primary-300 border border-primary-500/20"
                   : "text-surface-400 hover:text-surface-200 hover:bg-surface-800/60"
@@ -708,17 +709,20 @@ function Sidebar({
             }
             onClick={onClose}
           >
-            <PresenceIcon />
+            <span className="w-4 h-4 flex items-center justify-center shrink-0">
+              <PresenceIcon />
+            </span>
             <span>Team Presence</span>
           </NavLink>
 
+          {/* Sign Out button - compact and visually consistent */}
           <button
             id="sidebar-logout"
             onClick={handleLogout}
-            className="btn-danger w-full mt-2 text-sm py-2"
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium text-surface-400 hover:text-danger-300 hover:bg-danger-500/10 border border-surface-700/40 transition-colors"
           >
             <svg
-              className="w-4 h-4"
+              className="w-3.5 h-3.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

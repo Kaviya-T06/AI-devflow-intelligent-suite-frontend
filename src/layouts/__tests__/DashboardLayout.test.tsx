@@ -88,7 +88,7 @@ describe("Sidebar Navigation Ordering and Integrity", () => {
       ]);
     });
 
-    it("verifies Project Manager receives exact ordered list without any missing items", () => {
+    it("verifies Project Manager receives exact ordered list without any missing items and without ai-insights", () => {
       const managerItems = getNavItemsForRole("MANAGER");
       const managerIds = managerItems.map((i) => i.id);
 
@@ -104,9 +104,9 @@ describe("Sidebar Navigation Ordering and Integrity", () => {
         "pm-ai-continuity",
         "analytics",
         "notifications",
-        "ai-insights",
       ]);
-      expect(managerItems).toHaveLength(12);
+      expect(managerItems).toHaveLength(11);
+      expect(managerIds).not.toContain("ai-insights");
 
       // Verify routes
       expect(managerItems.map((i) => i.path)).toEqual([
@@ -121,7 +121,6 @@ describe("Sidebar Navigation Ordering and Integrity", () => {
         "/dashboard/pm-ai-continuity",
         "/dashboard/analytics",
         "/dashboard/notifications",
-        "/dashboard/ai-insights",
       ]);
     });
 
@@ -224,15 +223,14 @@ describe("Sidebar Navigation Ordering and Integrity", () => {
       expect(navLinks.some((txt) => txt?.includes("Settings"))).toBe(true);
     });
 
-    it("renders Project Manager sidebar with Project Pulse near top", () => {
+    it("renders Project Manager sidebar with Project Pulse near top and without AI Insights", () => {
       renderWithRole("MANAGER");
 
       expect(screen.getByText("Project Manager")).toBeInTheDocument();
       expect(screen.getByText("Project Pulse")).toBeInTheDocument();
       expect(screen.getByText("Smart Allocation")).toBeInTheDocument();
       expect(screen.getByText("Pending Reviews")).toBeInTheDocument();
-      expect(screen.getByText("AI Insights")).toBeInTheDocument();
-      expect(screen.getByText("Soon")).toBeInTheDocument();
+      expect(screen.queryByText("AI Insights")).not.toBeInTheDocument();
     });
 
     it("renders Developer sidebar with My Tasks, My Projects and AI Continuity near top", () => {
