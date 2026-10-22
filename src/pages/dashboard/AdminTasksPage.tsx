@@ -5,6 +5,9 @@ import { useEffect, useState, useMemo } from "react";
 import { fetchAllTasks, createTask, updateTask, deleteTask, fetchAllProjects, fetchAllUsers, type UserRecord } from "../../services/adminService";
 import type { Task, TaskPriority, TaskStatus, Project } from "../../types";
 import Modal from "../../components/ui/Modal";
+import { usePresence, STATUS_CONFIG } from "../../context/PresenceContext";
+import StatusDot from "../../components/presence/StatusDot";
+import type { AvailabilityStatus } from "../../types";
 
 const PRIORITY_COLORS: Record<TaskPriority, string> = {
   LOW:      "bg-surface-700/40 text-surface-400 border-surface-600/30",
@@ -35,6 +38,7 @@ interface ModalProps {
 }
 
 function TaskModal({ initial, onSave, onClose, projects, users }: ModalProps) {
+  const { getUserPresence } = usePresence();
   const [form, setForm] = useState({
     title:       initial?.title       ?? "",
     description: initial?.description ?? "",
@@ -130,7 +134,7 @@ function TaskModal({ initial, onSave, onClose, projects, users }: ModalProps) {
               onChange={(e) => setForm({ ...form, assigned_to: e.target.value || null })}>
               <option value="">Unassigned</option>
               {users.filter((u) => u.is_active).map((u) => (
-                <option key={u.id} value={u.id}>{u.name}</option>
+                <option key={u.id} value={u.id}>{u.name} ({getUserPresence(u.id)?.effective_status ? STATUS_CONFIG[getUserPresence(u.id)!.effective_status as AvailabilityStatus]?.label ?? "Offline" : "Offline"})</option>
               ))}
             </select>
           </div>
@@ -185,6 +189,7 @@ function ConfirmModal({ name, onConfirm, onClose }: { name: string; onConfirm: (
 // Main Page
 // ---------------------------------------------------------------------------
 export default function AdminTasksPage() {
+  const { getUserPresence } = usePresence();
   const [tasks, setTasks]       = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers]       = useState<UserRecord[]>([]);
@@ -357,7 +362,12 @@ export default function AdminTasksPage() {
                       {task.project_name || task.project?.name || (task.project_id ? (() => { console.warn(`Missing project info for valid project_id in task ${task.id}`); return "Project unavailable"; })() : "—")}
                     </td>
                     <td className="px-6 py-4 text-surface-400 text-sm">
-                      {task.developer_name || task.assignee?.full_name || "Unassigned"}
+                      <div className="flex items-center gap-2">
+                        {task.assigned_to && (
+                          <StatusDot presence={getUserPresence(task.assigned_to)} size="xs" />
+                        )}
+                        <span>{task.developer_name || task.assignee?.full_name || "Unassigned"}</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`badge ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>

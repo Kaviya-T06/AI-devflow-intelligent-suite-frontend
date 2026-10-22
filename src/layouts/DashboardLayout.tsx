@@ -5,9 +5,12 @@ import { useState, useEffect, type ReactNode } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { fetchUnreadCount } from "../services/notificationService";
+import { usePresence } from "../context/PresenceContext";
+import StatusSelector from "../components/presence/StatusSelector";
+import StatusDot from "../components/presence/StatusDot";
 import type { UserRole } from "../types";
 
-interface NavItem {
+export interface NavItem {
   id: string;
   label: string;
   path: string;
@@ -136,6 +139,11 @@ const AIIcon = () => (
     />
   </svg>
 );
+const PresenceIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
 const SettingsIcon = () => (
   <svg
     className="w-5 h-5"
@@ -219,7 +227,7 @@ const ReviewIcon = () => (
   </svg>
 );
 
-const ALL_NAV_ITEMS: NavItem[] = [
+export const ALL_NAV_ITEMS: NavItem[] = [
   {
     id: "dashboard",
     label: "Dashboard",
@@ -241,7 +249,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "My Tasks",
     path: "/dashboard/my-tasks",
     available: true,
-    roles: ["DEVELOPER"],
+    roles: ["DEVELOPER", "TEAM_MEMBER"],
     icon: <TasksIcon />,
   },
   {
@@ -249,7 +257,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "My Projects",
     path: "/dashboard/my-projects",
     available: true,
-    roles: ["DEVELOPER"],
+    roles: ["DEVELOPER", "TEAM_MEMBER"],
     icon: <ProjectsIcon />,
   },
   {
@@ -257,7 +265,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "My Activity",
     path: "/dashboard/my-activity",
     available: true,
-    roles: ["DEVELOPER"],
+    roles: ["DEVELOPER", "TEAM_MEMBER"],
     icon: <ActivityIcon />,
   },
   {
@@ -265,7 +273,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "My Workflow",
     path: "/dashboard/my-risks",
     available: true,
-    roles: ["DEVELOPER"],
+    roles: ["DEVELOPER", "TEAM_MEMBER"],
     icon: <WorkflowRisksIcon />,
   },
   // Manager-only nav items
@@ -339,7 +347,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "AI Continuity",
     path: "/dashboard/ai-continuity",
     available: true,
-    roles: ["DEVELOPER"],
+    roles: ["DEVELOPER", "TEAM_MEMBER"],
     icon: <AIIcon />,
   },
   // Admin-only nav items
@@ -397,10 +405,92 @@ const ALL_NAV_ITEMS: NavItem[] = [
     label: "Analytics",
     path: "/dashboard/analytics",
     available: true,
-    roles: ["ADMIN", "MANAGER", "DEVELOPER"],
+    roles: ["ADMIN", "MANAGER", "DEVELOPER", "TEAM_MEMBER"],
     icon: <AnalyticsIcon />,
   },
 ];
+
+export const ROLE_NAV_ORDER: Record<UserRole, string[]> = {
+  ADMIN: [
+    "dashboard",
+    "users",
+    "projects",
+    "tasks",
+    "pm-pending-reviews",
+    "workflow-risks",
+    "github-integration",
+    "pm-ai-continuity",
+    "analytics",
+    "activity",
+    "notifications",
+    "settings",
+  ],
+  MANAGER: [
+    "dashboard",
+    "pm-project-pulse",
+    "pm-projects",
+    "pm-team-tasks",
+    "pm-pending-reviews",
+    "pm-smart-allocation",
+    "pm-workflow-risks",
+    "github-integration",
+    "pm-ai-continuity",
+    "analytics",
+    "notifications",
+    "ai-insights",
+  ],
+  DEVELOPER: [
+    "dashboard",
+    "my-tasks",
+    "my-projects",
+    "dev-ai-continuity",
+    "my-risks",
+    "my-activity",
+    "analytics",
+    "notifications",
+  ],
+  TEAM_MEMBER: [
+    "dashboard",
+    "my-tasks",
+    "my-projects",
+    "dev-ai-continuity",
+    "my-risks",
+    "my-activity",
+    "analytics",
+    "notifications",
+  ],
+};
+
+/**
+ * Returns navigation items ordered by role workflow while guaranteeing 100% feature preservation.
+ */
+export function getNavItemsForRole(role: UserRole): NavItem[] {
+  const applicableItems = ALL_NAV_ITEMS.filter((item) => {
+    if (!item.roles) return true;
+    return item.roles.includes(role);
+  });
+
+  const itemMap = new Map<string, NavItem>();
+  applicableItems.forEach((item) => itemMap.set(item.id, item));
+
+  const preferredOrder = ROLE_NAV_ORDER[role] || [];
+  const orderedItems: NavItem[] = [];
+
+  for (const id of preferredOrder) {
+    const item = itemMap.get(id);
+    if (item) {
+      orderedItems.push(item);
+      itemMap.delete(id);
+    }
+  }
+
+  // Safety fallback: append any remaining accessible items that weren't in the list
+  for (const remainingItem of itemMap.values()) {
+    orderedItems.push(remainingItem);
+  }
+
+  return orderedItems;
+}
 
 const RoleBadge = ({ role }: { role: UserRole }) => {
   const cls =
@@ -425,6 +515,7 @@ function Sidebar({
 }) {
   const { profile, user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { myPresence, loading: presenceLoading, error: presenceError, isReconnecting, updateStatus, clearStatus } = usePresence();
   const isAdmin = role === "ADMIN";
   const isManager = role === "MANAGER";
 
@@ -452,11 +543,8 @@ function Sidebar({
         .slice(0, 2)
     : (displayEmail[0] ?? "A").toUpperCase();
 
-  // Filter nav items based on role
-  const navItems = ALL_NAV_ITEMS.filter((item) => {
-    if (!item.roles) return true; // available to all
-    return item.roles.includes(role);
-  });
+  // Filter and order nav items based on role workflow
+  const navItems = getNavItemsForRole(role);
 
   return (
     <>
@@ -563,8 +651,16 @@ function Sidebar({
             }
             onClick={onClose}
           >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
-              {initials}
+            <div className="relative shrink-0">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-sm">
+                {initials}
+              </div>
+              {/* Online presence indicator dot on avatar */}
+              <StatusDot
+                presence={myPresence}
+                size="xs"
+                className="absolute -bottom-0.5 -right-0.5 border-2 border-surface-900"
+              />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-surface-200 text-sm font-medium truncate">
@@ -580,6 +676,34 @@ function Sidebar({
               <RoleBadge role={profile?.role || role} />
             </div>
           )}
+
+          {/* Status selector */}
+          <div className="px-2 py-1">
+            <StatusSelector
+              myPresence={myPresence}
+              loading={presenceLoading}
+              error={presenceError}
+              isReconnecting={isReconnecting}
+              onUpdate={updateStatus}
+              onClear={clearStatus}
+            />
+          </div>
+
+          <NavLink
+            to="/dashboard/team-presence"
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                isActive
+                  ? "bg-primary-500/15 text-primary-300 border border-primary-500/20"
+                  : "text-surface-400 hover:text-surface-200 hover:bg-surface-800/60"
+              }`
+            }
+            onClick={onClose}
+          >
+            <PresenceIcon />
+            <span>Team Presence</span>
+          </NavLink>
+
           <button
             id="sidebar-logout"
             onClick={handleLogout}
@@ -608,6 +732,7 @@ function Sidebar({
 
 function TopHeader({ onMenuClick, unreadCount }: { onMenuClick: () => void; unreadCount: number }) {
   const { profile } = useAuth();
+  const { myPresence } = usePresence();
   const navigate = useNavigate();
 
   const initials = profile?.full_name
@@ -645,6 +770,15 @@ function TopHeader({ onMenuClick, unreadCount }: { onMenuClick: () => void; unre
       </div>
       <div className="flex items-center gap-3">
         <button
+          id="top-header-team-presence"
+          onClick={() => navigate("/dashboard/team-presence")}
+          aria-label="View team presence"
+          title="Team Presence & Availability"
+          className="p-2 rounded-lg text-surface-400 hover:text-surface-100 hover:bg-surface-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+        >
+          <PresenceIcon />
+        </button>
+        <button
           id="top-header-notification-bell"
           onClick={() => navigate("/dashboard/notifications")}
           aria-label="View notifications"
@@ -667,9 +801,14 @@ function TopHeader({ onMenuClick, unreadCount }: { onMenuClick: () => void; unre
           onClick={() => navigate("/dashboard/profile")}
           aria-label="View your profile"
           title="Your profile"
-          className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-xs hover:ring-2 hover:ring-primary-400 hover:ring-offset-2 hover:ring-offset-surface-900 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-900"
+          className="relative w-8 h-8 rounded-full bg-gradient-to-br from-primary-600 to-accent-500 flex items-center justify-center text-white font-bold text-xs hover:ring-2 hover:ring-primary-400 hover:ring-offset-2 hover:ring-offset-surface-900 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-900"
         >
           {initials}
+          <StatusDot
+            presence={myPresence}
+            size="xs"
+            className="absolute -bottom-0.5 -right-0.5 border border-surface-900"
+          />
         </button>
       </div>
     </header>

@@ -19,6 +19,9 @@ import {
 } from "../../services/pmService";
 import type { Task, PMDashboardStats } from "../../types";
 import Modal from "../../components/ui/Modal";
+import { usePresence, STATUS_CONFIG } from "../../context/PresenceContext";
+import StatusDot from "../../components/presence/StatusDot";
+import type { AvailabilityStatus } from "../../types";
 
 // ---------------------------------------------------------------------------
 // Types & Helpers
@@ -74,6 +77,7 @@ interface TaskFormData {
 }
 
 function TaskModal({
+
   mode,
   task,
   projects,
@@ -88,6 +92,7 @@ function TaskModal({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const { getUserPresence } = usePresence();
   const [form, setForm] = useState<TaskFormData>({
     title: task?.title ?? "",
     description: task?.description ?? "",
@@ -241,7 +246,7 @@ function TaskModal({
                 <option value="">— Unassigned —</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.name} ({u.role})
+                    {u.name} — {getUserPresence(u.id)?.effective_status ? STATUS_CONFIG[getUserPresence(u.id)!.effective_status as AvailabilityStatus]?.label ?? "Offline" : "Offline"} ({u.role})
                   </option>
                 ))}
               </select>
@@ -561,6 +566,7 @@ function RecommendationsModal({
 const REFRESH_INTERVAL_MS = 30_000;
 
 export default function PMTeamTasksPage() {
+  const { getUserPresence } = usePresence();
   const [searchParams] = useSearchParams();
   const projectIdParam = searchParams.get("project");
 
@@ -791,7 +797,12 @@ export default function PMTeamTasksPage() {
                             {task.project_name ?? "—"}
                           </td>
                           <td className="px-4 py-2.5 text-surface-400 text-sm whitespace-nowrap">
-                            {task.developer_name ?? <span className="text-surface-600 italic">Unassigned</span>}
+                            <div className="flex items-center gap-1.5">
+                              {task.assigned_to && (
+                                <StatusDot presence={getUserPresence(task.assigned_to)} size="xs" />
+                              )}
+                              <span>{task.developer_name ?? <span className="text-surface-600 italic">Unassigned</span>}</span>
+                            </div>
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap">
                             <span className={`badge text-xs px-2 py-0.5 rounded-full font-medium ${getPriorityBadgeClass(task.priority)}`}>
