@@ -117,8 +117,8 @@ export default function DeveloperWorkflowRisksPage() {
             { label: "Resolved",    value: resolvedCount,   color: "text-success-300" },
             { label: "Blockers",    value: blockerCount,    color: blockerCount > 0 ? "text-danger-300" : "text-surface-400" },
           ].map(({ label, value, color }) => (
-            <div key={label} className="glass-card p-3">
-              <p className="text-surface-500 text-xs uppercase tracking-wider">{label}</p>
+            <div key={label} className="glass-card p-3 flex flex-col justify-between min-w-0 h-full">
+              <p className="text-surface-500 text-xs uppercase tracking-wider min-w-0 break-words">{label}</p>
               <p className={`text-xl font-bold mt-1 ${color}`}>{value}</p>
             </div>
           ))}

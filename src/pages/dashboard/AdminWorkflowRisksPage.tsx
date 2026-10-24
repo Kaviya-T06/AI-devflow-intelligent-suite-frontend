@@ -152,7 +152,7 @@ export default function AdminWorkflowRisksPage() {
       </div>
 
       {/* Metrics grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
         {[
           { label: "Open",           value: m.open_risks,          color: "text-danger-300" },
           { label: "Critical",       value: m.critical_count,      color: "text-danger-400" },
@@ -163,8 +163,8 @@ export default function AdminWorkflowRisksPage() {
           { label: "Stuck Tasks",    value: m.stuck_tasks_count,   color: "text-orange-300" },
           { label: "Overdue Actions",value: m.overdue_actions_count, color: "text-danger-300" },
         ].map(({ label, value, color }) => (
-          <div key={label} className="glass-card p-3">
-            <p className="text-surface-500 text-xs uppercase tracking-wider leading-tight">{label}</p>
+          <div key={label} className="glass-card p-3 flex flex-col justify-between min-w-0 h-full">
+            <p className="text-surface-500 text-xs uppercase tracking-wider leading-tight min-w-0 break-words">{label}</p>
             <p className={`text-xl font-bold mt-1 ${color}`}>{value}</p>
           </div>
         ))}

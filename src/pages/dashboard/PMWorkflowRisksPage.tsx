@@ -143,7 +143,7 @@ export default function PMWorkflowRisksPage() {
       </div>
 
       {/* Metrics cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
         {[
           { label: "Open",           value: m.open_risks,          color: "text-danger-300",  icon: "🚨" },
           { label: "In Progress",    value: m.in_progress_risks,   color: "text-primary-300", icon: "▶" },
@@ -154,12 +154,12 @@ export default function PMWorkflowRisksPage() {
           { label: "Review Delays",  value: m.review_delays_count, color: "text-warning-300", icon: "🔄" },
           { label: "Overdue Actions",value: m.overdue_actions_count,color: "text-danger-300", icon: "📋" },
         ].map(({ label, value, color, icon }) => (
-          <div key={label} className="glass-card p-4">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-sm">{icon}</span>
-              <p className="text-surface-500 text-xs uppercase tracking-wider leading-tight">{label}</p>
+          <div key={label} className="glass-card p-3 sm:p-3.5 flex flex-col justify-between min-w-0 h-full">
+            <div className="flex items-start gap-1.5 min-w-0 mb-1.5">
+              <span className="text-sm shrink-0 leading-none mt-0.5" aria-hidden="true">{icon}</span>
+              <p className="text-surface-400 text-xs uppercase tracking-wider leading-tight min-w-0 break-words flex-1 font-medium">{label}</p>
             </div>
-            <p className={`text-2xl font-bold ${color}`}>{value}</p>
+            <p className={`text-xl sm:text-2xl font-bold ${color} leading-none mt-auto`}>{value}</p>
           </div>
         ))}
       </div>
