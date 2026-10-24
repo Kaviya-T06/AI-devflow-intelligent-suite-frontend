@@ -270,7 +270,30 @@ export interface ActivityLog {
 // ---------------------------------------------------------------------------
 
 export type RiskSeverity = "Low" | "Medium" | "High" | "Critical";
-export type RiskStatus = "OPEN" | "RESOLVED";
+export type RiskStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "REOPENED";
+export type ActionStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
+
+export interface RiskComment {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_role?: string | null;
+  content: string;
+  is_blocker: boolean;
+  evidence_url?: string | null;
+  created_at: string;
+}
+
+export interface RiskHistoryEntry {
+  id: string;
+  timestamp: string;
+  user_id?: string | null;
+  user_name?: string | null;
+  action: string;
+  details: string;
+  previous_value?: string | null;
+  new_value?: string | null;
+}
 
 export interface WorkflowRisk {
   id: string;
@@ -287,6 +310,78 @@ export interface WorkflowRisk {
   resolved_at?: string | null;
   created_at: string;
   updated_at: string;
+
+  // Investigation & Entity relationships
+  task_title?: string | null;
+  task_status?: string | null;
+  task_due_date?: string | null;
+  overdue_duration_days?: number | null;
+  assignee_id?: string | null;
+  assignee_name?: string | null;
+  project_manager_id?: string | null;
+  project_manager_name?: string | null;
+  owner_id?: string | null;
+  owner_name?: string | null;
+
+  // Detection & Severity explanations
+  detection_rule?: string | null;
+  detection_reason?: string | null;
+  severity_reason?: string | null;
+
+  // Corrective action tracking
+  corrective_action_plan?: string | null;
+  recovery_deadline?: string | null;
+  action_owner_id?: string | null;
+  action_owner_name?: string | null;
+  action_status: ActionStatus;
+  is_action_overdue: boolean;
+
+  // Escalations
+  is_escalated: boolean;
+  escalated_to?: string | null;
+  escalated_by?: string | null;
+  escalated_by_name?: string | null;
+  escalated_at?: string | null;
+  escalation_reason?: string | null;
+
+  // Resolution & Verification
+  resolution_notes?: string | null;
+  resolved_by?: string | null;
+  resolved_by_name?: string | null;
+  verified_by?: string | null;
+  verified_by_name?: string | null;
+  verification_notes?: string | null;
+
+  // Recurrence & Evidence Links
+  is_recurring: boolean;
+  recurrence_count: number;
+  github_pr_url?: string | null;
+  submission_id?: string | null;
+
+  // Discussion & Audit
+  comments_count: number;
+  comments: RiskComment[];
+  history: RiskHistoryEntry[];
+}
+
+export interface WorkflowRiskMetrics {
+  total_risks: number;
+  open_risks: number;
+  in_progress_risks: number;
+  resolved_risks: number;
+  reopened_risks: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  overdue_tasks_count: number;
+  review_delays_count: number;
+  stuck_tasks_count: number;
+  project_delays_count: number;
+  workload_risks_count: number;
+  overdue_actions_count: number;
+  escalated_count: number;
+  recurring_count: number;
 }
 
 // ---------------------------------------------------------------------------
