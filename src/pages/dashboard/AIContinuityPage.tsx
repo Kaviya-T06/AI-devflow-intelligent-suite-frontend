@@ -29,6 +29,7 @@ import {
   ShieldAlert,
   Info,
   CheckSquare,
+  ShieldCheck,
 } from "lucide-react";
 import { fetchAllProjects } from "../../services/adminService";
 import {
@@ -838,15 +839,15 @@ export default function AIContinuityPage() {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-surface-950 text-surface-100 relative">
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* Top Header: Sleek, unobtrusive workspace bar                        */}
+      {/* Top Header: Sleek, compact workspace bar                            */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      <header className="px-4 py-2 bg-surface-900/95 backdrop-blur-md border-b border-surface-800/80 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20 min-h-[44px]">
-        {/* Left: Minimal workspace identity (leaves hero as the primary focal point) */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-surface-800/80 border border-surface-700/60 flex items-center justify-center text-primary-400 shrink-0">
+      <header className="px-3 sm:px-4 py-1.5 bg-surface-900/95 backdrop-blur-md border-b border-surface-800/80 flex items-center justify-between gap-2 sm:gap-3 shrink-0 z-20 min-h-[42px]">
+        {/* Left: Minimal workspace identity */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-6 h-6 rounded-md bg-surface-800 border border-surface-700/60 flex items-center justify-center text-primary-400 shrink-0">
             <Sparkles className="w-3.5 h-3.5" />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <span className="text-xs font-semibold text-surface-200 tracking-tight">
               AI Continuity
             </span>
@@ -856,19 +857,19 @@ export default function AIContinuityPage() {
           </div>
         </div>
 
-        {/* Center: Clean Mode Switcher (AI Workspace vs. Handover Intelligence Dossier) */}
-        <div className="flex items-center bg-surface-950/80 p-0.5 rounded-lg border border-surface-800">
+        {/* Center: Mode Switcher (AI Workspace vs. Handover Intelligence Dossier) */}
+        <div className="flex items-center bg-surface-950/80 p-0.5 rounded-lg border border-surface-800 shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab("chat")}
-            className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
               activeTab === "chat"
                 ? "bg-primary-600 text-white shadow-sm shadow-primary-600/30"
                 : "text-surface-400 hover:text-surface-200"
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
-            <span>AI Workspace</span>
+            <span className="hidden xs:inline">AI Workspace</span>
           </button>
           <button
             type="button"
@@ -878,7 +879,7 @@ export default function AIContinuityPage() {
                 handleGenerate();
               }
             }}
-            className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
               activeTab === "dossier"
                 ? "bg-primary-600 text-white shadow-sm shadow-primary-600/30"
                 : "text-surface-400 hover:text-surface-200"
@@ -895,15 +896,15 @@ export default function AIContinuityPage() {
         </div>
 
         {/* Right: Project Selector & Clear Chat */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
           {/* Project Selector */}
-          <div className="flex items-center gap-1.5 bg-surface-950/70 px-2.5 py-1 rounded-lg border border-surface-800">
-            <label htmlFor="project-selector" className="text-[11px] font-semibold text-surface-400">
+          <div className="flex items-center gap-1.5 bg-surface-950/70 px-2 py-0.5 rounded-md border border-surface-800">
+            <label htmlFor="project-selector" className="text-[11px] font-semibold text-surface-400 shrink-0">
               Project:
             </label>
             <select
               id="project-selector"
-              className="bg-transparent text-surface-100 text-xs font-medium focus:outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate"
+              className="bg-transparent text-surface-100 text-xs font-medium focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[180px] md:max-w-[220px] truncate py-0.5"
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
               disabled={loadingProjects}
@@ -922,374 +923,119 @@ export default function AIContinuityPage() {
             <button
               onClick={handleClearChat}
               title="Start a new conversation and return to welcome screen"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-surface-200 hover:text-white bg-surface-800 hover:bg-surface-750 border border-surface-700/80 rounded-lg transition-all shadow-sm"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-surface-200 hover:text-white bg-surface-800 hover:bg-surface-750 border border-surface-700/80 rounded-md transition-all shadow-sm shrink-0"
             >
               <RotateCcw className="w-3.5 h-3.5 text-primary-400" />
-              <span>New Chat</span>
+              <span className="hidden sm:inline">New Chat</span>
             </button>
           )}
         </div>
       </header>
 
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* Compact Project Intelligence Context Strip                         */}
-      {/* Only shown during active conversation or Dossier peek              */}
+      {/* Compact Project Intelligence Context Bar (Single compact row)      */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {ctx?.project && (activeTab === "dossier" || currentChatLog.length > 0) ? (
-        <div className="px-4 py-2 bg-surface-900/60 border-b border-surface-800/80 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0 z-10">
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-surface-300">
-            <span className="font-bold text-white flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-primary-400" />
-              <span>{ctx.project.name || currentProject?.name || "Project"}</span>
+      <div className="px-3 sm:px-4 py-1.5 bg-surface-900/60 border-b border-surface-800/80 flex items-center justify-between gap-2 text-xs shrink-0 z-10 min-h-[34px]">
+        {/* Left: Combined project context indicators */}
+        <div className="flex items-center gap-2 sm:gap-2.5 text-surface-300 min-w-0 flex-1 overflow-x-auto scrollbar-none">
+          <span className="font-bold text-white flex items-center gap-1.5 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="truncate max-w-[160px] sm:max-w-[220px]">
+              {ctx?.project?.name || currentProject?.name || "Project"}
             </span>
-            <span className="text-surface-600 hidden sm:inline">|</span>
-            <span className="px-2 py-0.5 rounded bg-surface-800 text-surface-200 font-semibold border border-surface-700/80 text-[11px]">
-              {ctx.project.progress !== undefined ? `${ctx.project.progress}% Complete` : "0% Complete"}
-            </span>
-            <span className="text-surface-600 hidden sm:inline">|</span>
-            <span className="text-surface-300">
-              Managed by: <strong className="text-surface-100 font-semibold">{pmName}</strong>
-            </span>
-            {activeFocusTask && (
-              <>
-                <span className="text-surface-600 hidden md:inline">|</span>
-                <span className="text-primary-300 bg-primary-950/60 px-2 py-0.5 rounded border border-primary-500/20 font-medium hidden md:inline-flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-primary-400" />
-                  <span>{activeFocusTask.title}</span>
-                </span>
-              </>
-            )}
-            {github?.repository && (
-              <>
-                <span className="text-surface-600 hidden lg:inline">|</span>
-                <span className="text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/25 font-mono text-[11px] hidden lg:inline-flex items-center gap-1" title="Connected GitHub Repository">
-                  <GitBranch className="w-3 h-3 text-cyan-400" />
-                  <span>{github.repository}</span>
-                </span>
-              </>
-            )}
-          </div>
+          </span>
 
-          <div className="flex items-center gap-2 ml-auto">
-            {activeTab === "chat" ? (
-              <button
-                onClick={() => setShowContextDrawer((prev) => !prev)}
-                aria-expanded={showContextDrawer}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all border ${
-                  showContextDrawer
-                    ? "bg-primary-600/30 text-primary-200 border-primary-500/50 shadow-sm"
-                    : "bg-surface-800 hover:bg-surface-700 text-surface-200 border-surface-700"
-                }`}
+          <span className="text-surface-700 shrink-0">|</span>
+
+          <span className="px-1.5 py-0.5 rounded bg-surface-800 text-surface-200 font-semibold border border-surface-700/80 text-[11px] shrink-0">
+            {ctx?.project?.progress !== undefined ? `${ctx.project.progress}% Complete` : "0% Complete"}
+          </span>
+
+          <span className="text-surface-700 hidden sm:inline shrink-0">|</span>
+
+          <span className="text-surface-300 hidden sm:inline-flex items-center gap-1 shrink-0">
+            <span>Managed by:</span>
+            <strong className="text-surface-100 font-semibold">{pmName}</strong>
+          </span>
+
+          <span className="text-surface-700 hidden md:inline shrink-0">|</span>
+
+          {/* Authentication Status indicator */}
+          <span
+            className="text-emerald-400 bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-500/25 text-[11px] font-medium hidden md:inline-flex items-center gap-1 shrink-0"
+            title="Authentication status: Verified"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Authenticated</span>
+          </span>
+
+          {github?.repository ? (
+            <>
+              <span className="text-surface-700 hidden lg:inline shrink-0">|</span>
+              <span
+                className="text-cyan-300 bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-500/25 font-mono text-[11px] hidden lg:inline-flex items-center gap-1 shrink-0"
+                title="Connected GitHub Repository"
               >
-                <Layers className="w-3.5 h-3.5 text-primary-400" />
-                <span>{showContextDrawer ? "Hide Handover Intelligence" : "View Handover Intelligence"}</span>
-                {attentionRequired.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-danger-500/20 text-danger-300 text-[10px] font-bold border border-danger-500/30">
-                    {attentionRequired.length}
-                  </span>
-                )}
-                {showContextDrawer ? <ChevronUp className="w-3.5 h-3.5 ml-0.5" /> : <ChevronDown className="w-3.5 h-3.5 ml-0.5" />}
-              </button>
-            ) : (
-              <button
-                onClick={handleOpenContextModal}
-                className="px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 bg-surface-800 hover:bg-surface-700 text-surface-200 border border-surface-700 transition-all"
+                <GitBranch className="w-3 h-3 text-cyan-400" />
+                <span className="truncate max-w-[140px]">{github.repository}</span>
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-surface-700 hidden xl:inline shrink-0">|</span>
+              <span className="text-surface-500 text-[11px] hidden xl:inline-flex items-center gap-1 shrink-0">
+                <GitBranch className="w-3 h-3 text-surface-600" />
+                <span>No repo linked</span>
+              </span>
+            </>
+          )}
+
+          {activeFocusTask && (
+            <>
+              <span className="text-surface-700 hidden 2xl:inline shrink-0">|</span>
+              <span
+                className="text-primary-300 bg-primary-950/60 px-1.5 py-0.5 rounded border border-primary-500/20 font-medium hidden 2xl:inline-flex items-center gap-1 shrink-0 truncate max-w-[160px]"
+                title={`Active task: ${activeFocusTask.title}`}
               >
-                <Edit3 className="w-3.5 h-3.5 text-primary-400" />
-                <span>Edit Project Context</span>
-              </button>
-            )}
-          </div>
+                <Clock className="w-3 h-3 text-primary-400 shrink-0" />
+                <span className="truncate">{activeFocusTask.title}</span>
+              </span>
+            </>
+          )}
         </div>
-      ) : null}
 
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* Quick Peek Drawer (Collapsible inside chat workspace)              */}
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {showContextDrawer && activeTab === "chat" && (
-        <div className="border-b border-surface-800 bg-surface-900/95 backdrop-blur-xl max-h-[45vh] overflow-y-auto p-5 shadow-2xl transition-all z-20">
-          <div className="max-w-5xl mx-auto space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-surface-800">
-              <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-primary-400" />
-                  Verified Handover Intelligence & Database Records
-                </h2>
-                <p className="text-xs text-surface-400 mt-0.5">
-                  Grounded in verified tasks, activity logs, assignees, and workflow telemetry.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setShowContextDrawer(false);
-                    setActiveTab("dossier");
-                  }}
-                  className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 text-primary-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-surface-700 transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" /> Open Full Dossier
-                </button>
-                <button
-                  onClick={() => setShowContextDrawer(false)}
-                  className="p-1.5 text-surface-400 hover:text-surface-200 hover:bg-surface-800 rounded-lg transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Handover Narrative */}
-            {summary && (
-              <div
-                className={`p-3.5 rounded-xl border-l-4 ${
-                  summarySource === "ai"
-                    ? "border-l-primary-500 bg-primary-950/30 border-surface-800"
-                    : "border-l-info-500 bg-info-950/30 border-surface-800"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-primary-300">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {summarySource === "ai" ? "AI Handover Summary" : "Verified Database Briefing"}
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-800 text-surface-400 border border-surface-700">
-                    {summarySource === "ai" ? "Grounded AI Model" : "System Records"}
-                  </span>
-                </div>
-                <p className="text-surface-200 text-xs sm:text-sm leading-relaxed whitespace-pre-line">{summary.project_overview}</p>
-              </div>
-            )}
-
-            {/* The Four Handover Boxes (Preserved for Post-Interaction & Handover Review) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* BOX 1: What the Next Developer Should Know */}
-              <div className="p-4 bg-surface-950/70 rounded-xl border border-surface-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-surface-200 uppercase tracking-wider flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-primary-400" />
-                    What the Next Developer Should Know
-                  </h4>
-                  <span className="text-[10px] text-surface-400 font-mono">Box 1 of 4</span>
-                </div>
-                <p className="text-[11px] text-surface-400">
-                  Key architectural context and priorities before taking over this project.
-                </p>
-                <ul className="space-y-1.5 text-xs text-surface-300">
-                  {whatDeveloperShouldKnow.map((item, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-primary-400 font-bold mt-0.5">•</span>
-                      <span className="leading-relaxed">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-                {summary?.what_next_developer_should_know && summary.what_next_developer_should_know !== "N/A" && (
-                  <div className="p-2.5 rounded-lg bg-surface-900/90 border border-surface-800 text-xs text-surface-300 leading-relaxed mt-2">
-                    <strong className="block text-[11px] text-primary-300 uppercase font-semibold mb-1">AI Takeaway</strong>
-                    {summary.what_next_developer_should_know}
-                  </div>
-                )}
-              </div>
-
-              {/* BOX 2: Completed and Pending Work */}
-              <div className="p-4 bg-surface-950/70 rounded-xl border border-surface-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Completed and Pending Work
-                  </h4>
-                  <span className="text-[10px] text-surface-400 font-mono">Box 2 of 4</span>
-                </div>
-                <p className="text-[11px] text-surface-400">
-                  Verified deliverable status across in-flight, completed, and pending backlog tasks.
-                </p>
-
-                {/* In Progress */}
-                <div className="space-y-1.5">
-                  <div className="text-[11px] font-semibold text-primary-300 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-primary-400" />
-                    <span>Currently In Progress ({inProgressWork.length})</span>
-                  </div>
-                  {inProgressWork.length === 0 ? (
-                    <p className="text-xs text-surface-500 italic pl-4">No active work in progress.</p>
-                  ) : (
-                    <div className="space-y-1.5 pl-2 max-h-28 overflow-y-auto pr-1">
-                      {inProgressWork.map((t: any) => (
-                        <div key={t.id} className="p-2 bg-surface-900 rounded-lg border border-surface-800 text-xs flex items-center justify-between gap-2">
-                          <span className="font-semibold text-surface-200 truncate">{t.title}</span>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-800 text-surface-400">{t.devName}</span>
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary-500/20 text-primary-300">{t.priority}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Completed Work */}
-                <div className="space-y-1.5 pt-2 border-t border-surface-800/80">
-                  <div className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
-                    <Check className="w-3 h-3" />
-                    <span>Completed Deliverables ({completedWork.length})</span>
-                  </div>
-                  {completedWork.length === 0 ? (
-                    <p className="text-xs text-surface-500 italic pl-4">No completed tasks yet.</p>
-                  ) : (
-                    <div className="space-y-1 pl-2 max-h-24 overflow-y-auto pr-1">
-                      {completedWork.slice(0, 3).map((t: any) => (
-                        <div key={t.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-surface-900/60">
-                          <span className="text-surface-300 truncate">{t.title}</span>
-                          <span className="text-[10px] text-emerald-400 font-semibold shrink-0">VERIFIED</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Pending Work */}
-                <div className="space-y-1.5 pt-2 border-t border-surface-800/80">
-                  <div className="text-[11px] font-semibold text-surface-300 flex items-center gap-1">
-                    <Layers className="w-3 h-3 text-surface-400" />
-                    <span>Pending Backlog ({pendingWork.length})</span>
-                  </div>
-                  {pendingWork.length === 0 ? (
-                    <p className="text-xs text-surface-500 italic pl-4">No pending backlog tasks.</p>
-                  ) : (
-                    <div className="space-y-1 pl-2 max-h-24 overflow-y-auto pr-1">
-                      {pendingWork.slice(0, 3).map((t: any) => (
-                        <div key={t.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-surface-900/60">
-                          <span className="text-surface-300 truncate">{t.title}</span>
-                          <span className="text-[10px] text-surface-400 shrink-0">{t.devName}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* BOX 3: Items Requiring Attention */}
-              <div className="p-4 bg-surface-950/70 rounded-xl border border-surface-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-danger-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    Items Requiring Attention ({attentionRequired.length})
-                  </h4>
-                  <span className="text-[10px] text-surface-400 font-mono">Box 3 of 4</span>
-                </div>
-                <p className="text-[11px] text-surface-400">
-                  Overdue tasks, stuck workflows, and active technical risks.
-                </p>
-                {attentionRequired.length === 0 ? (
-                  <div className="space-y-2 py-3">
-                    <p className="text-xs text-emerald-400 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> No verified overdue tasks recorded.
-                    </p>
-                    <p className="text-xs text-emerald-400 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> No verified stuck workflows recorded.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {attentionRequired.map((t: any) => (
-                      <div key={t.id} className="p-2.5 bg-surface-900 rounded-lg border border-surface-800 text-xs space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-surface-200 truncate">{t.title}</span>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-danger-500/20 text-danger-300 shrink-0">
-                            {t.riskLabel}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[11px] text-surface-400">
-                          <span>Assignee: {t.devName}</span>
-                          <span>•</span>
-                          <span>Priority: {t.priority}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* BOX 4: Recorded Tasks, GitHub Pull Requests, and Issues */}
-              <div className="p-4 bg-surface-950/70 rounded-xl border border-surface-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <GitBranch className="w-3.5 h-3.5" />
-                    Recorded Tasks, GitHub Pull Requests, and Issues
-                  </h4>
-                  <span className="text-[10px] text-surface-400 font-mono">Box 4 of 4</span>
-                </div>
-                <p className="text-[11px] text-surface-400">
-                  Telemetry linking DevFlow database records and GitHub activity.
-                </p>
-
-                {/* Repository & Verification */}
-                <div className="p-2.5 rounded-lg bg-surface-900 border border-surface-800 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-surface-400 font-medium">Repository:</span>
-                    <span className="font-mono text-cyan-400 truncate max-w-[200px]">
-                      {github?.repository || "Not Connected"}
-                    </span>
-                  </div>
-                  <div className="text-[11px] flex items-center gap-1.5">
-                    {hasVerifiedMappings ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
-                        <Check className="w-3 h-3" /> GitHub activities verified & mapped to tasks.
-                      </span>
-                    ) : (
-                      <span className="text-surface-400 flex items-center gap-1">
-                        <Info className="w-3 h-3 text-surface-500" /> Mappings updated from database.
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Open PRs */}
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-semibold text-surface-300 block">
-                    Open Pull Requests ({unmappedPrs.length})
-                  </span>
-                  {unmappedPrs.length === 0 ? (
-                    <p className="text-xs text-surface-500 italic">No open pull requests recorded.</p>
-                  ) : (
-                    <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
-                      {unmappedPrs.slice(0, 3).map((pr: any, i: number) => (
-                        <div key={i} className="p-1.5 rounded bg-surface-900 text-xs flex items-center justify-between gap-2">
-                          <span className="text-surface-200 truncate">{pr.title}</span>
-                          <span className="text-[10px] text-cyan-400 shrink-0">{pr.author}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Recent Commits */}
-                <div className="space-y-1.5 pt-2 border-t border-surface-800/80">
-                  <span className="text-[11px] font-semibold text-surface-300 block">
-                    Recent Commits ({unmappedCommits.length})
-                  </span>
-                  {unmappedCommits.length === 0 ? (
-                    <p className="text-xs text-surface-500 italic">No recent commits recorded.</p>
-                  ) : (
-                    <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
-                      {unmappedCommits.slice(0, 3).map((c: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between text-xs py-1 px-1.5 rounded bg-surface-900/60">
-                          <span className="text-surface-300 truncate max-w-[200px]">
-                            {c.message ? c.message.split("\n")[0] : "Commit"}
-                          </span>
-                          <span className="font-mono text-[10px] text-surface-500 shrink-0">
-                            {c.sha ? c.sha.substring(0, 7) : ""}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Right: Handover Controls (Compact button / drawer toggle) */}
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+          {activeTab === "chat" ? (
+            <button
+              onClick={() => setShowContextDrawer((prev) => !prev)}
+              aria-expanded={showContextDrawer}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all border shrink-0 ${
+                showContextDrawer
+                  ? "bg-primary-600/30 text-primary-200 border-primary-500/50 shadow-sm"
+                  : "bg-surface-800 hover:bg-surface-700 text-surface-200 border-surface-700"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-primary-400" />
+              <span>{showContextDrawer ? "Hide Handover Intelligence" : "View Handover Intelligence"}</span>
+              {attentionRequired.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-danger-500/20 text-danger-300 text-[10px] font-bold border border-danger-500/30">
+                  {attentionRequired.length}
+                </span>
+              )}
+              {showContextDrawer ? <ChevronUp className="w-3.5 h-3.5 ml-0.5" /> : <ChevronDown className="w-3.5 h-3.5 ml-0.5" />}
+            </button>
+          ) : (
+            <button
+              onClick={handleOpenContextModal}
+              className="px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 bg-surface-800 hover:bg-surface-700 text-surface-200 border border-surface-700 transition-all shrink-0"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-primary-400" />
+              <span>Edit Project Context</span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* VIEW 1: CONVERSATIONAL CHAT WORKSPACE (ChatGPT-like)                */}
@@ -1298,55 +1044,356 @@ export default function AIContinuityPage() {
         <main className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-surface-950">
           <span className="sr-only">AI Continuity Assistant</span>
 
+          {/* Handover Intelligence Slide-Over Secondary Panel (Non-intrusive drawer) */}
+          {showContextDrawer && (
+            <>
+              {/* Mobile overlay backdrop */}
+              <div
+                className="fixed inset-0 bg-black/60 z-25 sm:hidden"
+                onClick={() => setShowContextDrawer(false)}
+              />
+              <aside
+                aria-label="Handover Intelligence"
+                className="absolute top-0 right-0 bottom-0 w-full sm:w-[500px] lg:w-[560px] xl:w-[620px] bg-surface-900/98 backdrop-blur-2xl border-l border-surface-700/80 shadow-2xl z-30 flex flex-col animate-slide-in overflow-hidden"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800 shrink-0 bg-surface-900">
+                  <div className="min-w-0 pr-2">
+                    <h2 className="text-sm font-bold text-white flex items-center gap-2 truncate">
+                      <FileText className="w-4 h-4 text-primary-400 shrink-0" />
+                      <span>Verified Handover Intelligence & Database Records</span>
+                    </h2>
+                    <p className="text-[11px] text-surface-400 truncate">
+                      Grounded in verified tasks, activity logs, assignees, and workflow telemetry.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => {
+                        setShowContextDrawer(false);
+                        setActiveTab("dossier");
+                      }}
+                      className="px-2.5 py-1 bg-surface-800 hover:bg-surface-700 text-primary-300 rounded-md text-xs font-semibold flex items-center gap-1 border border-surface-700 transition-colors"
+                      title="Open Full Dossier"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Open Full Dossier</span>
+                    </button>
+                    <button
+                      onClick={() => setShowContextDrawer(false)}
+                      className="p-1.5 text-surface-400 hover:text-surface-200 hover:bg-surface-800 rounded-md transition-colors"
+                      aria-label="Close Handover Intelligence"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Scrollable Handover Content (Contains the 4 Boxes and narrative) */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {/* Handover Narrative */}
+                  {summary && (
+                    <div
+                      className={`p-3 rounded-xl border-l-4 ${
+                        summarySource === "ai"
+                          ? "border-l-primary-500 bg-primary-950/30 border-surface-800"
+                          : "border-l-info-500 bg-info-950/30 border-surface-800"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-primary-300">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          {summarySource === "ai" ? "AI Handover Summary" : "Verified Database Briefing"}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-800 text-surface-400 border border-surface-700">
+                          {summarySource === "ai" ? "Grounded AI Model" : "System Records"}
+                        </span>
+                      </div>
+                      <p className="text-surface-200 text-xs sm:text-sm leading-relaxed whitespace-pre-line">{summary.project_overview}</p>
+                    </div>
+                  )}
+
+                  {/* The Four Handover Boxes */}
+                  <div className="space-y-4">
+                    {/* BOX 1: What the Next Developer Should Know */}
+                    <div className="p-3.5 bg-surface-950/70 rounded-xl border border-surface-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-surface-200 uppercase tracking-wider flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-primary-400" />
+                          What the Next Developer Should Know
+                        </h4>
+                        <span className="text-[10px] text-surface-400 font-mono">Box 1 of 4</span>
+                      </div>
+                      <p className="text-[11px] text-surface-400">
+                        Key architectural context and priorities before taking over this project.
+                      </p>
+                      <ul className="space-y-1.5 text-xs text-surface-300">
+                        {whatDeveloperShouldKnow.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="text-primary-400 font-bold mt-0.5">•</span>
+                            <span className="leading-relaxed">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      {summary?.what_next_developer_should_know && summary.what_next_developer_should_know !== "N/A" && (
+                        <div className="p-2.5 rounded-lg bg-surface-900/90 border border-surface-800 text-xs text-surface-300 leading-relaxed mt-1">
+                          <strong className="block text-[11px] text-primary-300 uppercase font-semibold mb-1">AI Takeaway</strong>
+                          {summary.what_next_developer_should_know}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* BOX 2: Completed and Pending Work */}
+                    <div className="p-3.5 bg-surface-950/70 rounded-xl border border-surface-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Completed and Pending Work
+                        </h4>
+                        <span className="text-[10px] text-surface-400 font-mono">Box 2 of 4</span>
+                      </div>
+                      <p className="text-[11px] text-surface-400">
+                        Verified deliverable status across in-flight, completed, and pending backlog tasks.
+                      </p>
+
+                      {/* In Progress */}
+                      <div className="space-y-1.5">
+                        <div className="text-[11px] font-semibold text-primary-300 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-primary-400" />
+                          <span>Currently In Progress ({inProgressWork.length})</span>
+                        </div>
+                        {inProgressWork.length === 0 ? (
+                          <p className="text-xs text-surface-500 italic pl-4">No active work in progress.</p>
+                        ) : (
+                          <div className="space-y-1.5 pl-2 max-h-28 overflow-y-auto pr-1">
+                            {inProgressWork.map((t: any) => (
+                              <div key={t.id} className="p-2 bg-surface-900 rounded-lg border border-surface-800 text-xs flex items-center justify-between gap-2">
+                                <span className="font-semibold text-surface-200 truncate">{t.title}</span>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-800 text-surface-400">{t.devName}</span>
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary-500/20 text-primary-300">{t.priority}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Completed Work */}
+                      <div className="space-y-1.5 pt-2 border-t border-surface-800/80">
+                        <div className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          <span>Completed Deliverables ({completedWork.length})</span>
+                        </div>
+                        {completedWork.length === 0 ? (
+                          <p className="text-xs text-surface-500 italic pl-4">No completed tasks yet.</p>
+                        ) : (
+                          <div className="space-y-1 pl-2 max-h-24 overflow-y-auto pr-1">
+                            {completedWork.slice(0, 3).map((t: any) => (
+                              <div key={t.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-surface-900/60">
+                                <span className="text-surface-300 truncate">{t.title}</span>
+                                <span className="text-[10px] text-emerald-400 font-semibold shrink-0">VERIFIED</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Pending Work */}
+                      <div className="space-y-1.5 pt-2 border-t border-surface-800/80">
+                        <div className="text-[11px] font-semibold text-surface-300 flex items-center gap-1">
+                          <Layers className="w-3 h-3 text-surface-400" />
+                          <span>Pending Backlog ({pendingWork.length})</span>
+                        </div>
+                        {pendingWork.length === 0 ? (
+                          <p className="text-xs text-surface-500 italic pl-4">No pending backlog tasks.</p>
+                        ) : (
+                          <div className="space-y-1 pl-2 max-h-24 overflow-y-auto pr-1">
+                            {pendingWork.slice(0, 3).map((t: any) => (
+                              <div key={t.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-surface-900/60">
+                                <span className="text-surface-300 truncate">{t.title}</span>
+                                <span className="text-[10px] text-surface-400 shrink-0">{t.devName}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* BOX 3: Items Requiring Attention */}
+                    <div className="p-3.5 bg-surface-950/70 rounded-xl border border-surface-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-danger-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          Items Requiring Attention ({attentionRequired.length})
+                        </h4>
+                        <span className="text-[10px] text-surface-400 font-mono">Box 3 of 4</span>
+                      </div>
+                      <p className="text-[11px] text-surface-400">
+                        Overdue tasks, stuck workflows, and active technical risks.
+                      </p>
+                      {attentionRequired.length === 0 ? (
+                        <div className="space-y-1.5 py-2">
+                          <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> No verified overdue tasks recorded.
+                          </p>
+                          <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> No verified stuck workflows recorded.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                          {attentionRequired.map((t: any) => (
+                            <div key={t.id} className="p-2.5 bg-surface-900 rounded-lg border border-surface-800 text-xs space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-semibold text-surface-200 truncate">{t.title}</span>
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-danger-500/20 text-danger-300 shrink-0">
+                                  {t.riskLabel}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-surface-400">
+                                <span>Assignee: {t.devName}</span>
+                                <span>•</span>
+                                <span>Priority: {t.priority}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* BOX 4: Recorded Tasks, GitHub Pull Requests, and Issues */}
+                    <div className="p-3.5 bg-surface-950/70 rounded-xl border border-surface-800 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <GitBranch className="w-3.5 h-3.5" />
+                          Recorded Tasks, GitHub Pull Requests, and Issues
+                        </h4>
+                        <span className="text-[10px] text-surface-400 font-mono">Box 4 of 4</span>
+                      </div>
+                      <p className="text-[11px] text-surface-400">
+                        Telemetry linking DevFlow database records and GitHub activity.
+                      </p>
+
+                      {/* Repository & Verification */}
+                      <div className="p-2.5 rounded-lg bg-surface-900 border border-surface-800 space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-surface-400 font-medium">Repository:</span>
+                          <span className="font-mono text-cyan-400 truncate max-w-[200px]">
+                            {github?.repository || "Not Connected"}
+                          </span>
+                        </div>
+                        <div className="text-[11px] flex items-center gap-1.5">
+                          {hasVerifiedMappings ? (
+                            <span className="text-emerald-400 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> GitHub activities verified & mapped to tasks.
+                            </span>
+                          ) : (
+                            <span className="text-surface-400 flex items-center gap-1">
+                              <Info className="w-3 h-3 text-surface-500" /> Mappings updated from database.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Open PRs */}
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-semibold text-surface-300 block">
+                          Open Pull Requests ({unmappedPrs.length})
+                        </span>
+                        {unmappedPrs.length === 0 ? (
+                          <p className="text-xs text-surface-500 italic">No open pull requests recorded.</p>
+                        ) : (
+                          <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                            {unmappedPrs.slice(0, 3).map((pr: any, i: number) => (
+                              <div key={i} className="p-1.5 rounded bg-surface-900 text-xs flex items-center justify-between gap-2">
+                                <span className="text-surface-200 truncate">{pr.title}</span>
+                                <span className="text-[10px] text-cyan-400 shrink-0">{pr.author}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Recent Commits */}
+                      <div className="space-y-1.5 pt-2 border-t border-surface-800/80">
+                        <span className="text-[11px] font-semibold text-surface-300 block">
+                          Recent Commits ({unmappedCommits.length})
+                        </span>
+                        {unmappedCommits.length === 0 ? (
+                          <p className="text-xs text-surface-500 italic">No recent commits recorded.</p>
+                        ) : (
+                          <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                            {unmappedCommits.slice(0, 3).map((c: any, i: number) => (
+                              <div key={i} className="flex items-center justify-between text-xs py-1 px-1.5 rounded bg-surface-900/60">
+                                <span className="text-surface-300 truncate max-w-[200px]">
+                                  {c.message ? c.message.split("\n")[0] : "Commit"}
+                                </span>
+                                <span className="font-mono text-[10px] text-surface-500 shrink-0">
+                                  {c.sha ? c.sha.substring(0, 7) : ""}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </>
+          )}
+
           {/* Scrollable Message History & Welcome View */}
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 py-4 sm:py-6 scroll-smooth flex flex-col min-h-0">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 py-3 sm:py-4 scroll-smooth flex flex-col min-h-0">
             {/* INITIAL WELCOME SCREEN (Rendered immediately from frontend on initial load) */}
             {currentChatLog.length === 0 ? (
-              <div className="max-w-4xl xl:max-w-5xl mx-auto w-full my-auto flex flex-col items-center justify-center text-center animate-fade-in px-2 py-4 select-none">
+              <div className="max-w-4xl xl:max-w-5xl mx-auto w-full my-auto flex flex-col items-center justify-center text-center animate-fade-in px-2 py-2 select-none">
                 {/* 1. Welcome Symbol, Heading, and Subtitle */}
-                <div className="flex flex-col items-center mb-6">
+                <div className="flex flex-col items-center mb-3">
                   {/* Glowing AI Star / Sparkle Symbol with complementary intelligence circuit badge */}
-                  <div className="relative group mb-3.5">
-                    <div className="absolute -inset-2 bg-gradient-to-r from-primary-600/35 via-indigo-600/35 to-blue-500/30 rounded-2xl blur-xl opacity-60 group-hover:opacity-85 transition duration-500" />
-                    <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-primary-500 via-indigo-600 to-cyan-400 p-0.5 shadow-xl shadow-indigo-500/25 flex items-center justify-center">
+                  <div className="relative group mb-2">
+                    <div className="absolute -inset-1.5 bg-gradient-to-r from-primary-600/35 via-indigo-600/35 to-blue-500/30 rounded-2xl blur-lg opacity-60 group-hover:opacity-85 transition duration-500" />
+                    <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-primary-500 via-indigo-600 to-cyan-400 p-0.5 shadow-lg shadow-indigo-500/25 flex items-center justify-center">
                       <div className="w-full h-full bg-surface-950/95 backdrop-blur-md rounded-[14px] flex items-center justify-center relative overflow-hidden">
-                        <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-primary-300 drop-shadow-[0_0_14px_rgba(99,102,241,0.7)] animate-pulse" />
+                        <Sparkles className="w-6 h-6 sm:w-7 sm:h-7 text-primary-300 drop-shadow-[0_0_12px_rgba(99,102,241,0.7)] animate-pulse" />
                       </div>
                     </div>
                     <div
-                      className="absolute -bottom-1 -right-1 w-5 h-5 rounded-md bg-surface-900 border border-primary-500/40 shadow-lg flex items-center justify-center"
+                      className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-md bg-surface-900 border border-primary-500/40 shadow-lg flex items-center justify-center"
                       title="AI Neural Intelligence Core"
                     >
-                      <Cpu className="w-3 h-3 text-cyan-400" />
+                      <Cpu className="w-2.5 h-2.5 text-cyan-400" />
                     </div>
                   </div>
 
                   {/* Exact Main Heading & Subtitle */}
-                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight drop-shadow-sm leading-tight mb-2">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm leading-tight mb-1">
                     Your Project. Your Intelligence.
                   </h1>
-                  <p className="text-xs sm:text-sm text-surface-400 max-w-xl mx-auto leading-relaxed font-normal">
+                  <p className="text-xs sm:text-sm text-surface-400 max-w-lg mx-auto leading-relaxed font-normal">
                     Your AI workspace for project understanding, development assistance, and intelligent handovers.
                   </p>
                 </div>
 
                 {/* 2. The Original Four Cards with Arrow/Chevron Marks */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 w-full mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 w-full mb-3">
                   {/* Card 1: Project Overview */}
                   <button
                     type="button"
                     disabled={asking}
                     onClick={() => handleAsk("What is the current project status and overview?")}
-                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-primary-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-primary-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-3 sm:p-3.5 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-primary-500/50 text-left transition-all duration-200 group shadow-md hover:shadow-primary-500/10 flex flex-col justify-between min-h-[105px] sm:min-h-[115px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-primary-600/15 border border-primary-500/25 flex items-center justify-center text-primary-400">
-                          <FileText className="w-4 h-4" />
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-7 h-7 rounded-lg bg-primary-600/15 border border-primary-500/25 flex items-center justify-center text-primary-400">
+                          <FileText className="w-3.5 h-3.5" />
                         </div>
-                        <ChevronRight className="w-4 h-4 text-surface-500 group-hover:text-primary-400 group-hover:translate-x-0.5 transition-all" />
+                        <ChevronRight className="w-3.5 h-3.5 text-surface-500 group-hover:text-primary-400 group-hover:translate-x-0.5 transition-all" />
                       </div>
-                      <h3 className="text-xs font-bold text-surface-100 group-hover:text-primary-300 transition-colors uppercase tracking-wider mb-1.5">
+                      <h3 className="text-xs font-bold text-surface-100 group-hover:text-primary-300 transition-colors uppercase tracking-wider mb-1">
                         Project Overview
                       </h3>
                       <p className="text-[11px] text-surface-400 line-clamp-2 leading-relaxed">
@@ -1356,7 +1403,7 @@ export default function AIContinuityPage() {
                           }`}
                       </p>
                     </div>
-                    <div className="mt-3 pt-2.5 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
+                    <div className="mt-2 pt-2 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
                       <span>Manager: {pmName}</span>
                       <span className="text-primary-400 font-semibold group-hover:underline flex items-center gap-0.5">Explore →</span>
                     </div>
@@ -1367,16 +1414,16 @@ export default function AIContinuityPage() {
                     type="button"
                     disabled={asking}
                     onClick={() => handleAsk("What did the previous developer complete?")}
-                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-emerald-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-emerald-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-3 sm:p-3.5 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-emerald-500/50 text-left transition-all duration-200 group shadow-md hover:shadow-emerald-500/10 flex flex-col justify-between min-h-[105px] sm:min-h-[115px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-600/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400">
-                          <CheckCircle2 className="w-4 h-4" />
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-600/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
                         </div>
-                        <ChevronRight className="w-4 h-4 text-surface-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+                        <ChevronRight className="w-3.5 h-3.5 text-surface-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
                       </div>
-                      <h3 className="text-xs font-bold text-surface-100 group-hover:text-emerald-300 transition-colors uppercase tracking-wider mb-1.5">
+                      <h3 className="text-xs font-bold text-surface-100 group-hover:text-emerald-300 transition-colors uppercase tracking-wider mb-1">
                         Previous Developer Work
                       </h3>
                       <p className="text-[11px] text-surface-400 line-clamp-2 leading-relaxed">
@@ -1386,7 +1433,7 @@ export default function AIContinuityPage() {
                             : "Verified historical task completions and architecture milestones.")}
                       </p>
                     </div>
-                    <div className="mt-3 pt-2.5 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
+                    <div className="mt-2 pt-2 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
                       <span>{completedWork.length} Completed</span>
                       <span className="text-emerald-400 font-semibold group-hover:underline flex items-center gap-0.5">Explore →</span>
                     </div>
@@ -1397,16 +1444,16 @@ export default function AIContinuityPage() {
                     type="button"
                     disabled={asking}
                     onClick={() => handleAsk("What is the current work in progress and active team focus?")}
-                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-amber-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-amber-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-3 sm:p-3.5 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-amber-500/50 text-left transition-all duration-200 group shadow-md hover:shadow-amber-500/10 flex flex-col justify-between min-h-[105px] sm:min-h-[115px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-amber-600/15 border border-amber-500/25 flex items-center justify-center text-amber-400">
-                          <Clock className="w-4 h-4" />
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-7 h-7 rounded-lg bg-amber-600/15 border border-amber-500/25 flex items-center justify-center text-amber-400">
+                          <Clock className="w-3.5 h-3.5" />
                         </div>
-                        <ChevronRight className="w-4 h-4 text-surface-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
+                        <ChevronRight className="w-3.5 h-3.5 text-surface-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
                       </div>
-                      <h3 className="text-xs font-bold text-surface-100 group-hover:text-amber-300 transition-colors uppercase tracking-wider mb-1.5">
+                      <h3 className="text-xs font-bold text-surface-100 group-hover:text-amber-300 transition-colors uppercase tracking-wider mb-1">
                         Current Work
                       </h3>
                       <p className="text-[11px] text-surface-400 line-clamp-2 leading-relaxed">
@@ -1416,7 +1463,7 @@ export default function AIContinuityPage() {
                             : `${inProgressWork.length} active task(s) currently in flight.`)}
                       </p>
                     </div>
-                    <div className="mt-3 pt-2.5 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
+                    <div className="mt-2 pt-2 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
                       <span>{inProgressWork.length} In Progress</span>
                       <span className="text-amber-400 font-semibold group-hover:underline flex items-center gap-0.5">Explore →</span>
                     </div>
@@ -1427,16 +1474,16 @@ export default function AIContinuityPage() {
                     type="button"
                     disabled={asking}
                     onClick={() => handleAsk("What work is still pending and which tasks have been pending for a long time?")}
-                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-indigo-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-indigo-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-3 sm:p-3.5 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-indigo-500/50 text-left transition-all duration-200 group shadow-md hover:shadow-indigo-500/10 flex flex-col justify-between min-h-[105px] sm:min-h-[115px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-600/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400">
-                          <AlertTriangle className="w-4 h-4" />
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-600/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400">
+                          <AlertTriangle className="w-3.5 h-3.5" />
                         </div>
-                        <ChevronRight className="w-4 h-4 text-surface-500 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
+                        <ChevronRight className="w-3.5 h-3.5 text-surface-500 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
                       </div>
-                      <h3 className="text-xs font-bold text-surface-100 group-hover:text-indigo-300 transition-colors uppercase tracking-wider mb-1.5">
+                      <h3 className="text-xs font-bold text-surface-100 group-hover:text-indigo-300 transition-colors uppercase tracking-wider mb-1">
                         Pending Work
                       </h3>
                       <p className="text-[11px] text-surface-400 line-clamp-2 leading-relaxed">
@@ -1446,7 +1493,7 @@ export default function AIContinuityPage() {
                             : `${pendingWork.length} task(s) pending in backlog queue.`)}
                       </p>
                     </div>
-                    <div className="mt-3 pt-2.5 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
+                    <div className="mt-2 pt-2 border-t border-surface-800/80 flex items-center justify-between text-[10px] text-surface-500">
                       <span>{pendingAgeInfo ? `Incomplete for ${pendingAgeInfo.durationStr}` : `${pendingWork.length} Pending`}</span>
                       <span className="text-indigo-400 font-semibold group-hover:underline flex items-center gap-0.5">Explore →</span>
                     </div>
@@ -1454,11 +1501,11 @@ export default function AIContinuityPage() {
                 </div>
 
                 {/* 3. Original Suggested Questions Chips */}
-                <div className="w-full space-y-2.5 pt-1">
-                  <div className="text-[11px] font-bold text-surface-400 uppercase tracking-wider text-center">
+                <div className="w-full space-y-1.5 pt-0.5">
+                  <div className="text-[10px] font-bold text-surface-400 uppercase tracking-wider text-center">
                     Suggested Questions
                   </div>
-                  <div className="flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-3xl mx-auto">
                     {[
                       "What is the current project status?",
                       "What work is still pending?",
@@ -1472,7 +1519,7 @@ export default function AIContinuityPage() {
                         type="button"
                         onClick={() => handleAsk(q)}
                         disabled={asking}
-                        className="text-xs px-3.5 py-1.5 rounded-full bg-surface-900/80 hover:bg-surface-800 text-surface-300 hover:text-white border border-surface-750 hover:border-primary-500/50 transition-all shadow-sm flex items-center gap-1.5 group disabled:opacity-50 cursor-pointer"
+                        className="text-xs px-3 py-1 rounded-full bg-surface-900/80 hover:bg-surface-800 text-surface-300 hover:text-white border border-surface-750 hover:border-primary-500/50 transition-all shadow-sm flex items-center gap-1.5 group disabled:opacity-50 cursor-pointer"
                       >
                         <span className="text-primary-400 group-hover:scale-110 transition-transform">💬</span>
                         <span>{q}</span>
@@ -1604,36 +1651,23 @@ export default function AIContinuityPage() {
 
                 {/* Post-Interaction: 4 Handover Boxes Quick Access Strip (hidden while AI is generating) */}
                 {!asking && (
-                  <div className="pt-3 pb-1 border-t border-surface-800/80 animate-fade-in">
-                    <div className="p-3.5 rounded-xl bg-surface-900/60 border border-surface-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-primary-600/20 border border-primary-500/30 flex items-center justify-center text-primary-400 shrink-0">
-                          <Layers className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="font-semibold text-surface-200 flex items-center gap-2">
-                            <span>Project Handover Intelligence</span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-surface-800 text-primary-300 border border-surface-700">
-                              4 Handover Boxes
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-surface-400">
-                            Developer takeaways, completed & pending tasks, attention items, and GitHub telemetry.
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowContextDrawer((prev) => !prev)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-800 hover:bg-surface-700 text-primary-300 border border-surface-700 flex items-center gap-1.5 transition-colors shadow-sm"
-                        >
-                          <Layers className="w-3.5 h-3.5" />
-                          <span>{showContextDrawer ? "Hide Handover Boxes" : "View 4 Handover Boxes"}</span>
-                          {showContextDrawer ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
+                  <div className="pt-2 pb-1 border-t border-surface-800/60 flex items-center justify-between gap-3 text-xs text-surface-400 animate-fade-in">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-3.5 h-3.5 text-primary-400 shrink-0" />
+                      <span className="font-medium text-surface-300">Project Handover Intelligence:</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] bg-surface-800 text-primary-300 border border-surface-700 font-mono">
+                        4 Handover Boxes
+                      </span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowContextDrawer((prev) => !prev)}
+                      className="px-2.5 py-1 rounded-md text-xs font-semibold bg-surface-800 hover:bg-surface-700 text-primary-300 border border-surface-700 flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>{showContextDrawer ? "Hide Handover Boxes" : "View 4 Handover Boxes"}</span>
+                      {showContextDrawer ? <ChevronUp className="w-3.5 h-3.5 ml-0.5" /> : <ChevronDown className="w-3.5 h-3.5 ml-0.5" />}
+                    </button>
                   </div>
                 )}
 
@@ -1642,17 +1676,17 @@ export default function AIContinuityPage() {
             )}
           </div>
 
-
           {/* ───────────────────────────────────────────────────────────────── */}
-          {/* Pinned Message Composer & Suggested Quick Prompts                 */}
+          {/* Anchored Message Composer & Horizontally Scrollable Prompts       */}
           {/* ───────────────────────────────────────────────────────────────── */}
-          <div className="p-4 bg-gradient-to-t from-surface-950 via-surface-950/95 to-transparent shrink-0 z-10 space-y-2">
-            <div className="max-w-3xl xl:max-w-4xl mx-auto w-full space-y-2">
-              {/* Quick Suggested Prompt Pills (visible when conversation is active) */}
+          <div className="px-4 pt-1.5 pb-2.5 bg-surface-950/95 border-t border-surface-800/80 shrink-0 z-20">
+            <div className="max-w-3xl xl:max-w-4xl mx-auto w-full space-y-1.5">
+              {/* Quick Suggested Prompt Pills (compact horizontally scrollable row directly above composer) */}
               {currentChatLog.length > 0 && (
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                  <span className="text-[11px] font-bold text-surface-400 uppercase tracking-wider shrink-0">
-                    Suggested Questions:
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+                  <span className="text-[10px] font-bold text-surface-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-primary-400" />
+                    <span>Suggested:</span>
                   </span>
                   {SUGGESTED_QUESTIONS.map((item, i) => (
                     <button
@@ -1660,7 +1694,7 @@ export default function AIContinuityPage() {
                       type="button"
                       onClick={() => handleAsk(item.question)}
                       disabled={asking}
-                      className="text-xs px-3 py-1 rounded-full bg-surface-900/90 hover:bg-surface-800 text-surface-300 hover:text-white border border-surface-700/80 hover:border-primary-500/40 transition-all shrink-0 whitespace-nowrap shadow-sm disabled:opacity-50"
+                      className="text-[11px] px-2.5 py-0.5 rounded-full bg-surface-900/90 hover:bg-surface-800 text-surface-300 hover:text-white border border-surface-750 hover:border-primary-500/40 transition-all shrink-0 whitespace-nowrap shadow-sm disabled:opacity-50"
                     >
                       {item.question}
                     </button>
@@ -1674,11 +1708,11 @@ export default function AIContinuityPage() {
                   e.preventDefault();
                   handleAsk();
                 }}
-                className="relative bg-surface-900/90 backdrop-blur-md border border-surface-700/80 focus-within:border-primary-500/80 rounded-2xl shadow-2xl p-2 transition-all flex items-end gap-2"
+                className="relative bg-surface-900/90 backdrop-blur-md border border-surface-700/80 focus-within:border-primary-500/80 rounded-2xl shadow-xl px-3 py-1.5 transition-all flex items-end gap-2"
               >
                 <textarea
                   ref={textareaRef}
-                  rows={Math.min(question.split("\n").length, 4) || 1}
+                  rows={Math.min(Math.max(question.split("\n").length, 1), 4)}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -1688,16 +1722,16 @@ export default function AIContinuityPage() {
                       : "Ask about tasks, risks, PRs, code, or general concepts... (Enter to send, Shift+Enter for newline)"
                   }
                   disabled={asking}
-                  className="flex-1 bg-transparent text-sm text-surface-100 placeholder-surface-500 focus:outline-none resize-none px-3 py-2 max-h-36 overflow-y-auto leading-relaxed disabled:opacity-50"
+                  className="flex-1 bg-transparent text-sm text-surface-100 placeholder-surface-500 focus:outline-none resize-none py-1.5 max-h-32 overflow-y-auto leading-relaxed disabled:opacity-50"
                 />
 
-                <div className="flex items-center gap-1.5 pb-1 pr-1">
+                <div className="flex items-center gap-1.5 pb-0.5 shrink-0">
                   {asking ? (
                     <button
                       type="button"
                       onClick={handleCancelGeneration}
                       title="Stop generating response"
-                      className="p-2.5 rounded-xl bg-danger-500/20 hover:bg-danger-500/30 text-danger-300 border border-danger-500/30 transition-all flex items-center justify-center shrink-0"
+                      className="p-2 rounded-xl bg-danger-500/20 hover:bg-danger-500/30 text-danger-300 border border-danger-500/30 transition-all flex items-center justify-center shrink-0"
                     >
                       <Square className="w-4 h-4 fill-current" />
                     </button>
@@ -1706,7 +1740,7 @@ export default function AIContinuityPage() {
                       type="submit"
                       disabled={asking || !question.trim()}
                       aria-label="Send question"
-                      className="p-2.5 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 text-white shadow-lg shadow-primary-500/25 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center shrink-0"
+                      className="p-2 rounded-xl bg-gradient-to-tr from-primary-600 to-indigo-600 hover:from-primary-500 hover:to-indigo-500 text-white shadow-md shadow-primary-500/25 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center shrink-0"
                     >
                       <Send className="w-4 h-4" />
                     </button>
@@ -1714,7 +1748,7 @@ export default function AIContinuityPage() {
                 </div>
               </form>
 
-              <div className="text-center text-[11px] text-surface-500">
+              <div className="text-center text-[10px] text-surface-500">
                 DevFlow AI Continuity Assistant · Grounded in verified engineering data & development intelligence
               </div>
             </div>
