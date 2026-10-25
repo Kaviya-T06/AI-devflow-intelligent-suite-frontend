@@ -108,13 +108,14 @@ const ALL_TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "whatif",   label: "What-If",  icon: "🔬" },
 ];
 
-function statusBadge(status: string) {
+function statusBadge(status?: string | null) {
+  const s = (status || "").toLowerCase();
   const cls =
-    status === "active"    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20" :
-    status === "planning"  ? "bg-blue-500/15 text-blue-300 border-blue-500/20" :
-    status === "on_hold"   ? "bg-amber-500/15 text-amber-300 border-amber-500/20" :
-    status === "completed" ? "bg-purple-500/15 text-purple-300 border-purple-500/20" :
-                             "bg-surface-700/50 text-surface-400 border-surface-700/50";
+    s === "active"    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20" :
+    s === "planning"  ? "bg-blue-500/15 text-blue-300 border-blue-500/20" :
+    s === "on_hold"   ? "bg-amber-500/15 text-amber-300 border-amber-500/20" :
+    s === "completed" ? "bg-purple-500/15 text-purple-300 border-purple-500/20" :
+                        "bg-surface-700/50 text-surface-400 border-surface-700/50";
   return `badge text-xs px-2.5 py-1 rounded-full font-medium capitalize border ${cls}`;
 }
 
@@ -138,7 +139,7 @@ function OverviewTab({ project, tasks }: { project: Project; tasks: Task[] }) {
             <h3 className="text-xl font-bold text-surface-50">{project.name}</h3>
             {project.description && <p className="text-surface-400 text-sm mt-1">{project.description}</p>}
           </div>
-          <span className={statusBadge(project.status)}>{project.status.replace("_", " ")}</span>
+          <span className={statusBadge(project.status)}>{(project.status || "planning").replace("_", " ")}</span>
         </div>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div><p className="text-surface-500 text-xs">Start Date</p><p className="text-surface-200 font-medium">{fmt(project.start_date)}</p></div>
@@ -147,11 +148,11 @@ function OverviewTab({ project, tasks }: { project: Project; tasks: Task[] }) {
         <div>
           <div className="flex justify-between text-xs mb-1.5">
             <span className="text-surface-400">Progress</span>
-            <span className="text-primary-400 font-semibold">{project.progress}%</span>
+            <span className="text-primary-400 font-semibold">{project.progress ?? 0}%</span>
           </div>
           <div className="w-full h-2 bg-surface-700 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all duration-700"
-              style={{ width: `${Math.min(100, Math.max(0, project.progress))}%` }} />
+              style={{ width: `${Math.min(100, Math.max(0, project.progress ?? 0))}%` }} />
           </div>
         </div>
       </div>
@@ -939,6 +940,27 @@ function HistoryTab({ projectId, projectName, tasks }: { projectId: string; proj
   );
 }
 
+function countWorkingDays(fromStr: string, toStr: string): number {
+  const from = new Date(fromStr);
+  const to = new Date(toStr);
+  if (to <= from) return 0;
+  let count = 0;
+  const cur = new Date(from);
+  cur.setDate(cur.getDate() + 1);
+  while (cur <= to) {
+    const day = cur.getDay();
+    if (day !== 0 && day !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
+function computeCapacity(workingDays: number, developers: { capacity_hours_per_week?: number | null }[]): number {
+  if (workingDays <= 0 || !developers.length) return 0;
+  const totalDailyHours = developers.reduce((sum, d) => sum + ((d.capacity_hours_per_week ?? 40) / 5), 0);
+  return Math.round(totalDailyHours * workingDays * 10) / 10;
+}
+
 // ---------------------------------------------------------------------------
 // What-If Tab — read-only deadline simulation & effort/capacity management
 // ---------------------------------------------------------------------------
@@ -1055,423 +1077,672 @@ function WhatIfTab({ project }: { project: Project }) {
     }
   };
 
+  // CURRENT SCENARIO METRICS (Baseline)
+  const todayStr = new Date().toISOString().split("T")[0];
+  const currentDeadline = result?.baseline.current_deadline ?? simData?.current_deadline ?? project.end_date ?? null;
+  const currentWorkingDays = currentDeadline ? countWorkingDays(todayStr, currentDeadline) : 0;
+  const currentRemainingTasks = result?.baseline.remaining_tasks ?? simData?.total_remaining_tasks ?? 0;
+  const tasksWithEstimates = result?.baseline.tasks_with_estimates ?? simData?.tasks_with_estimates ?? 0;
+  const tasksMissingEstimates = result?.baseline.tasks_missing_estimates ?? simData?.tasks_missing_estimates ?? 0;
+
+  const currentAvailableCapacity = result?.baseline.available_capacity_hours !== undefined && result?.baseline.available_capacity_hours !== null
+    ? result.baseline.available_capacity_hours
+    : (simData ? computeCapacity(currentWorkingDays, simData.developers) : null);
+
+  const currentEffort = result?.baseline.remaining_estimated_effort_hours !== undefined && result?.baseline.remaining_estimated_effort_hours !== null
+    ? result.baseline.remaining_estimated_effort_hours
+    : (simData ? simData.total_estimated_effort_hours : null);
+
+  const currentCapacityGap = tasksMissingEstimates > 0
+    ? null
+    : (currentAvailableCapacity !== null && currentEffort !== null
+        ? Math.round((currentAvailableCapacity - currentEffort) * 10) / 10
+        : null);
+
+  // HYPOTHETICAL SCENARIO METRICS
+  const hypotheticalDeadline = result?.scenario.proposed_deadline ?? (proposedDate || null);
+  const hypotheticalWorkingDays = result?.scenario.working_days !== undefined
+    ? result.scenario.working_days
+    : (hypotheticalDeadline ? countWorkingDays(todayStr, hypotheticalDeadline) : 0);
+
+  const hypotheticalRemainingTasks = result?.scenario.remaining_tasks ?? currentRemainingTasks;
+
+  const hypotheticalCapacity = result?.scenario.available_capacity_hours !== undefined && result?.scenario.available_capacity_hours !== null
+    ? result.scenario.available_capacity_hours
+    : (hypotheticalDeadline && simData ? computeCapacity(hypotheticalWorkingDays, simData.developers) : null);
+
+  const hypotheticalEffort = result?.scenario.remaining_estimated_effort_hours !== undefined && result?.scenario.remaining_estimated_effort_hours !== null
+    ? result.scenario.remaining_estimated_effort_hours
+    : currentEffort;
+
+  const hypotheticalCapacityGap = tasksMissingEstimates > 0
+    ? null
+    : (result?.scenario.capacity_gap_hours !== undefined && result.scenario.capacity_gap_hours !== null
+        ? result.scenario.capacity_gap_hours
+        : (hypotheticalCapacity !== null && hypotheticalEffort !== null
+            ? Math.round((hypotheticalCapacity - hypotheticalEffort) * 10) / 10
+            : null));
+
+  // IMPACT DIFFERENCES
+  const daysDiff = hypotheticalDeadline && currentDeadline
+    ? hypotheticalWorkingDays - currentWorkingDays
+    : null;
+
+  const capacityDiff = hypotheticalCapacity !== null && currentAvailableCapacity !== null
+    ? Math.round((hypotheticalCapacity - currentAvailableCapacity) * 10) / 10
+    : null;
+
+  const gapDiff = tasksMissingEstimates > 0
+    ? null
+    : (hypotheticalCapacityGap !== null && currentCapacityGap !== null
+        ? Math.round((hypotheticalCapacityGap - currentCapacityGap) * 10) / 10
+        : null);
+
+  // FEASIBILITY EVALUATION
+  const isPastOrTodayDeadline = hypotheticalDeadline
+    ? new Date(hypotheticalDeadline).getTime() <= new Date().setHours(0, 0, 0, 0)
+    : false;
+
+  let feasibilityBadge: { label: string; subtext: string; colorClass: string; bgClass: string; borderClass: string } | null = null;
+
+  if (!hypotheticalDeadline) {
+    feasibilityBadge = {
+      label: "Pending Selection",
+      subtext: "Select a proposed deadline to evaluate",
+      colorClass: "text-surface-400",
+      bgClass: "bg-surface-800",
+      borderClass: "border-surface-700",
+    };
+  } else if (isPastOrTodayDeadline) {
+    feasibilityBadge = {
+      label: "Infeasible",
+      subtext: "Proposed deadline is today or in the past (0 working days)",
+      colorClass: "text-danger-400",
+      bgClass: "bg-danger-500/10",
+      borderClass: "border-danger-500/30",
+    };
+  } else if (tasksMissingEstimates > 0) {
+    feasibilityBadge = {
+      label: "Unavailable",
+      subtext: "Effort estimates missing for remaining tasks",
+      colorClass: "text-warning-400",
+      bgClass: "bg-warning-500/10",
+      borderClass: "border-warning-500/30",
+    };
+  } else if (hypotheticalCapacity === 0 || hypotheticalCapacity === null) {
+    feasibilityBadge = {
+      label: "Capacity Missing",
+      subtext: "Assigned developers have 0 recorded working hours",
+      colorClass: "text-warning-400",
+      bgClass: "bg-warning-500/10",
+      borderClass: "border-warning-500/30",
+    };
+  } else if (hypotheticalCapacityGap !== null && hypotheticalCapacityGap < 0) {
+    const shortfall = Math.abs(hypotheticalCapacityGap);
+    feasibilityBadge = {
+      label: "Capacity Shortfall",
+      subtext: `Workload exceeds capacity by ${shortfall} hrs`,
+      colorClass: "text-danger-400",
+      bgClass: "bg-danger-500/10",
+      borderClass: "border-danger-500/30",
+    };
+  } else if (hypotheticalCapacityGap !== null && hypotheticalCapacityGap >= 0) {
+    feasibilityBadge = {
+      label: "Feasible",
+      subtext: `Sufficient capacity (+${hypotheticalCapacityGap} hrs buffer)`,
+      colorClass: "text-success-400",
+      bgClass: "bg-success-500/10",
+      borderClass: "border-success-500/30",
+    };
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-800/40 p-4 rounded-xl border border-surface-700/50 text-xs text-surface-400 leading-relaxed">
-        <div>
-          <span className="font-semibold text-warning-400">🔬 Simulation Mode:</span> This is{" "}
-          <strong className="text-surface-300">read-only</strong>. Running a simulation{" "}
-          <strong className="text-surface-300">never</strong> modifies real project data or deadlines.
-          Results are hypothetical calculations based on actual project tasks and developer records.
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold text-surface-50 flex items-center gap-2.5">
+            <svg className="w-6 h-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+            </svg>
+            What-If Simulator
+          </h2>
+          <p className="text-surface-400 text-sm">
+            Compare your current project schedule with a proposed scenario.
+          </p>
         </div>
+
         <button
+          type="button"
           onClick={() => setShowEditor(!showEditor)}
-          className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-surface-700/80 hover:bg-surface-700 text-surface-200 border border-surface-600 rounded-lg text-xs font-medium transition-colors"
+          className="self-start sm:self-center flex items-center gap-2 px-3.5 py-1.5 bg-surface-800 hover:bg-surface-700 text-surface-200 border border-surface-700 rounded-lg text-xs font-medium transition-colors"
         >
-          <span>{showEditor ? "Hide" : "Manage"} Estimates & Capacity</span>
-          {simData && (
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-              simData.sufficient_data_for_simulation
-                ? "bg-success-500/20 text-success-300"
-                : "bg-warning-500/20 text-warning-300"
-            }`}>
-              {simData.sufficient_data_for_simulation ? "Ready" : "Incomplete"}
-            </span>
-          )}
+          <span>{showEditor ? "Hide" : "Manage"} Estimates</span>
+          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+            simData?.sufficient_data_for_simulation 
+              ? "bg-success-500/20 text-success-300" 
+              : "bg-warning-500/20 text-warning-300"
+          }`}>
+            {simData?.sufficient_data_for_simulation ? "Ready" : "Incomplete"}
+          </span>
         </button>
       </div>
 
-      {/* Project Data & Estimates Management Section */}
+      {/* Project Data & Estimates Management Drawer */}
       {showEditor && (
         loadingData ? (
           <div className="glass-card p-5 text-center text-surface-400 text-xs animate-pulse">
-            Loading project estimates &amp; developer capacity…
+            Loading project data…
           </div>
         ) : simData ? (
           <div className="glass-card p-5 border-primary-500/30 animate-fade-in space-y-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-3 border-b border-surface-700/60">
-            <div>
-              <h3 className="font-bold text-surface-100 text-sm flex items-center gap-2">
-                <span>📊</span> Manage Task Estimates & Developer Capacity
-              </h3>
-              <p className="text-xs text-surface-400 mt-0.5">
-                Saved values are stored directly in the database and immediately power the What-If calculation.
-              </p>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="bg-surface-800 px-2.5 py-1 rounded-md text-surface-300 border border-surface-700">
-                Tasks: <strong>{simData.tasks_with_estimates}/{simData.total_remaining_tasks}</strong> estimated
-              </span>
-              <span className="bg-surface-800 px-2.5 py-1 rounded-md text-surface-300 border border-surface-700">
-                Total Effort: <strong>{simData.total_estimated_effort_hours}h</strong>
-              </span>
-              <span className="bg-surface-800 px-2.5 py-1 rounded-md text-surface-300 border border-surface-700">
-                Developers: <strong>{simData.developers_with_capacity}/{simData.developers.length}</strong> with capacity
-              </span>
-            </div>
-          </div>
-
-          {saveSuccess && (
-            <div className="bg-success-500/10 border border-success-500/20 text-success-300 p-2.5 rounded-lg text-xs flex items-center gap-2">
-              <span>✅</span> {saveSuccess}
-            </div>
-          )}
-
-          <div className="flex border-b border-surface-700/40 text-xs">
-            <button
-              onClick={() => setEditorTab("tasks")}
-              className={`px-3 py-2 font-medium border-b-2 transition-colors ${
-                editorTab === "tasks" ? "border-primary-500 text-primary-400" : "border-transparent text-surface-400 hover:text-surface-200"
-              }`}
-            >
-              Remaining Tasks & Estimates ({simData.tasks.length})
-            </button>
-            <button
-              onClick={() => setEditorTab("developers")}
-              className={`px-3 py-2 font-medium border-b-2 transition-colors ${
-                editorTab === "developers" ? "border-primary-500 text-primary-400" : "border-transparent text-surface-400 hover:text-surface-200"
-              }`}
-            >
-              Assigned Developer Capacities ({simData.developers.length})
-            </button>
-          </div>
-
-          {editorTab === "tasks" ? (
-            <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
-              {simData.tasks.length === 0 ? (
-                <p className="text-xs text-surface-500 py-3 text-center">No remaining tasks in this project.</p>
-              ) : (
-                simData.tasks.map((task) => (
-                  <div key={task.id} className="bg-surface-800/60 p-3 rounded-lg border border-surface-700/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-medium text-surface-100">{task.title}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-300">{task.status}</span>
-                        {task.estimated_hours === null && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning-500/15 text-warning-300 border border-warning-500/20">
-                            ⚠️ Needs estimate
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-surface-400">
-                        Assignee: <span className="text-surface-300">{task.assigned_to_name || "Unassigned"}</span>
-                        {task.due_date && <> • Due: <span className="text-surface-300">{task.due_date}</span></>}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex items-center gap-1.5">
-                        <label className="text-[11px] text-surface-400">Estimated Hours:</label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          placeholder="Hours"
-                          value={taskInputs[task.id] ?? ""}
-                          onChange={(e) => setTaskInputs({ ...taskInputs, [task.id]: e.target.value })}
-                          className="w-20 bg-surface-900 border border-surface-700 rounded px-2 py-1 text-xs text-surface-100 focus:outline-none focus:border-primary-500 font-mono"
-                        />
-                      </div>
-                      <button
-                        onClick={() => handleSaveTaskEstimate(task.id)}
-                        disabled={savingField === `task-${task.id}`}
-                        className="px-2.5 py-1 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white rounded text-xs transition-colors font-medium"
-                      >
-                        {savingField === `task-${task.id}` ? "Saving…" : "Save"}
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
-              {simData.developers.length === 0 ? (
-                <p className="text-xs text-surface-500 py-3 text-center">No developers assigned to remaining tasks.</p>
-              ) : (
-                simData.developers.map((dev) => (
-                  <div key={dev.developer_id} className="bg-surface-800/60 p-3 rounded-lg border border-surface-700/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-medium text-surface-100">{dev.name}</span>
-                        {dev.has_capacity ? (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-success-500/20 text-success-300">
-                            {dev.capacity_hours_per_week}h/week
-                          </span>
-                        ) : (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning-500/20 text-warning-300">
-                            ⚠️ Missing Capacity
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-surface-400">
-                        {dev.email} • {dev.assigned_tasks_count} assigned task(s)
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex items-center gap-1.5">
-                        <label className="text-[11px] text-surface-400">Weekly Capacity:</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="168"
-                          step="1"
-                          placeholder="Hrs/wk"
-                          value={devInputs[dev.developer_id] ?? ""}
-                          onChange={(e) => setDevInputs({ ...devInputs, [dev.developer_id]: e.target.value })}
-                          className="w-20 bg-surface-900 border border-surface-700 rounded px-2 py-1 text-xs text-surface-100 focus:outline-none focus:border-primary-500 font-mono"
-                        />
-                      </div>
-                      <button
-                        onClick={() => handleSaveDeveloperCapacity(dev.developer_id)}
-                        disabled={savingField === `dev-${dev.developer_id}`}
-                        className="px-2.5 py-1 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white rounded text-xs transition-colors font-medium"
-                      >
-                        {savingField === `dev-${dev.developer_id}` ? "Saving…" : "Save"}
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      ) : null)}
-
-      {/* Simulator Inputs & Results Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div>
-          <div className="glass-card p-5 space-y-4">
-            <h3 className="font-bold text-surface-100 text-sm">🔬 Deadline Simulation</h3>
-            <div className="space-y-3 p-3 bg-surface-800/50 rounded-lg border border-surface-700/50">
-              <p className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider">✓ Verified Current Facts</p>
-              <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-surface-500">Project</span>
-                  <span className="text-surface-200 font-medium truncate max-w-[170px]">{project.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-surface-500">Current Deadline</span>
-                  <span className="text-surface-200 font-medium">{fmt(project.end_date)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-surface-500">Remaining Tasks</span>
-                  <span className="text-surface-200 font-medium">{simData?.total_remaining_tasks ?? "—"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-surface-500">Total Recorded Effort</span>
-                  <span className="text-primary-400 font-medium">{simData ? `${simData.total_estimated_effort_hours}h` : "—"}</span>
-                </div>
-              </div>
-            </div>
-            <form onSubmit={run} className="space-y-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-3 border-b border-surface-700/60">
               <div>
-                <label className="block text-surface-400 text-xs font-medium mb-1">
-                  📅 Proposed Deadline <span className="text-warning-400">(Hypothetical)</span>
-                </label>
-                <input
-                  type="date"
-                  value={proposedDate}
-                  onChange={(e) => { setDate(e.target.value); setResult(null); }}
-                  className="w-full bg-surface-800 border border-surface-700/50 rounded-lg px-3 py-2 text-surface-100 text-sm focus:outline-none focus:border-primary-500/50"
-                  required
-                />
+                <h3 className="font-bold text-surface-100 text-sm flex items-center gap-2">
+                  <span>📊</span> Manage Task Estimates & Developer Capacity
+                </h3>
+                <p className="text-xs text-surface-400 mt-0.5">
+                  Saved values are stored directly in the database and immediately update both Current and Hypothetical metrics.
+                </p>
               </div>
-              {err && <div className="bg-danger-500/10 border border-danger-500/20 text-danger-400 p-3 rounded-lg text-xs">⚠️ {err}</div>}
+              
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="bg-surface-800 px-2.5 py-1 rounded-md text-surface-300 border border-surface-700">
+                  Tasks: <strong>{simData.tasks_with_estimates}/{simData.total_remaining_tasks}</strong> estimated
+                </span>
+                <span className="bg-surface-800 px-2.5 py-1 rounded-md text-surface-300 border border-surface-700">
+                  Effort: <strong>{simData.total_estimated_effort_hours}h</strong>
+                </span>
+                <span className="bg-surface-800 px-2.5 py-1 rounded-md text-surface-300 border border-surface-700">
+                  Developers: <strong>{simData.developers_with_capacity}/{simData.developers.length}</strong> with capacity
+                </span>
+              </div>
+            </div>
+
+            {saveSuccess && (
+              <div className="bg-success-500/10 border border-success-500/20 text-success-300 p-2.5 rounded-lg text-xs flex items-center gap-2">
+                <span>✅</span> {saveSuccess}
+              </div>
+            )}
+
+            <div className="flex border-b border-surface-700/40 text-xs">
               <button
-                type="submit"
-                disabled={simulating || !proposedDate}
-                className="w-full bg-primary-600 hover:bg-primary-500 disabled:bg-surface-700 disabled:text-surface-500 text-white font-medium text-sm py-2.5 rounded-lg transition-colors"
+                onClick={() => setEditorTab("tasks")}
+                className={`px-3 py-2 font-medium border-b-2 transition-colors ${
+                  editorTab === "tasks" ? "border-primary-500 text-primary-400" : "border-transparent text-surface-400 hover:text-surface-200"
+                }`}
               >
-                {simulating ? "Running Simulation…" : "Run Simulation"}
+                Remaining Tasks & Estimates ({simData.tasks.length})
               </button>
-            </form>
+              <button
+                onClick={() => setEditorTab("developers")}
+                className={`px-3 py-2 font-medium border-b-2 transition-colors ${
+                  editorTab === "developers" ? "border-primary-500 text-primary-400" : "border-transparent text-surface-400 hover:text-surface-200"
+                }`}
+              >
+                Assigned Developer Capacities ({simData.developers.length})
+              </button>
+            </div>
+
+            {editorTab === "tasks" ? (
+              <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
+                {simData.tasks.length === 0 ? (
+                  <p className="text-xs text-surface-500 py-3 text-center">No remaining tasks in this project.</p>
+                ) : (
+                  simData.tasks.map((task) => (
+                    <div key={task.id} className="bg-surface-800/60 p-3 rounded-lg border border-surface-700/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-surface-100">{task.title}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-300">{task.status}</span>
+                          {task.estimated_hours === null && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning-500/15 text-warning-300 border border-warning-500/20">
+                              ⚠️ Needs estimate
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-surface-400">
+                          Assignee: <span className="text-surface-300">{task.assigned_to_name || "Unassigned"}</span>
+                          {task.due_date && <> • Due: <span className="text-surface-300">{task.due_date}</span></>}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[11px] text-surface-400">Estimated Hours:</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            placeholder="Hours"
+                            value={taskInputs[task.id] ?? ""}
+                            onChange={(e) => setTaskInputs({ ...taskInputs, [task.id]: e.target.value })}
+                            className="w-20 bg-surface-900 border border-surface-700 rounded px-2 py-1 text-xs text-surface-100 focus:outline-none focus:border-primary-500 font-mono"
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleSaveTaskEstimate(task.id)}
+                          disabled={savingField === `task-${task.id}`}
+                          className="px-2.5 py-1 bg-primary-600 hover:bg-primary-500 text-white rounded text-xs transition-colors font-medium"
+                        >
+                          {savingField === `task-${task.id}` ? "Saving…" : "Save"}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
+                {simData.developers.length === 0 ? (
+                  <p className="text-xs text-surface-500 py-3 text-center">No developers assigned to remaining tasks.</p>
+                ) : (
+                  simData.developers.map((dev) => (
+                    <div key={dev.developer_id} className="bg-surface-800/60 p-3 rounded-lg border border-surface-700/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-surface-100">{dev.name}</span>
+                          {dev.has_capacity ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-success-500/20 text-success-300">
+                              {dev.capacity_hours_per_week}h/week
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning-500/20 text-warning-300">
+                              ⚠️ Missing Capacity
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-surface-400">
+                          {dev.email} • {dev.assigned_tasks_count} assigned task(s)
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[11px] text-surface-400">Weekly Capacity:</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="168"
+                            step="1"
+                            placeholder="Hrs/wk"
+                            value={devInputs[dev.developer_id] ?? ""}
+                            onChange={(e) => setDevInputs({ ...devInputs, [dev.developer_id]: e.target.value })}
+                            className="w-20 bg-surface-900 border border-surface-700 rounded px-2 py-1 text-xs text-surface-100 focus:outline-none focus:border-primary-500 font-mono"
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleSaveDeveloperCapacity(dev.developer_id)}
+                          disabled={savingField === `dev-${dev.developer_id}`}
+                          className="px-2.5 py-1 bg-primary-600 hover:bg-primary-500 text-white rounded text-xs transition-colors font-medium"
+                        >
+                          {savingField === `dev-${dev.developer_id}` ? "Saving…" : "Save"}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        ) : null
+      )}
+
+      {/* Simulation Controls Bar */}
+      <div className="glass-card p-4 rounded-xl border border-surface-700/60 bg-surface-900/60">
+        <form onSubmit={run} className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3.5">
+          <div className="flex-1">
+            <label className="block text-surface-400 text-xs font-semibold mb-1 uppercase tracking-wider">
+              Proposed Deadline
+            </label>
+            <input
+              type="date"
+              value={proposedDate}
+              onChange={(e) => {
+                setDate(e.target.value);
+                if (result) setResult(null);
+              }}
+              className="w-full bg-surface-800 border border-surface-700/60 rounded-lg px-3 py-2 text-surface-100 text-sm focus:outline-none focus:border-primary-500/50 font-mono"
+              required
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={simulating || !proposedDate}
+              className="px-5 py-2 bg-primary-600 hover:bg-primary-500 disabled:bg-surface-700 disabled:text-surface-500 text-white font-medium text-sm rounded-lg transition-colors flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-primary-500/20"
+            >
+              {simulating ? "Simulating…" : "Run Simulation"}
+            </button>
+          </div>
+        </form>
+
+        {err && (
+          <div className="mt-3 bg-danger-500/10 border border-danger-500/20 text-danger-400 p-2.5 rounded-lg text-xs flex items-center gap-2">
+            <span>⚠️</span> {err}
+          </div>
+        )}
+      </div>
+
+      {/* Main Side-by-Side Current vs. Hypothetical Comparison */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* CURRENT PANEL */}
+        <div className="glass-card p-6 rounded-2xl border border-surface-700/70 bg-surface-900/40 flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-surface-700/60">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-surface-400"></span>
+              <h3 className="text-base font-bold text-surface-100 tracking-wide">CURRENT</h3>
+            </div>
+            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded bg-surface-800 text-surface-300 border border-surface-700">
+              Verified Baseline
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {/* 1. Current Deadline */}
+            <div className="p-3.5 rounded-xl bg-surface-800/50 border border-surface-700/40 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Current Deadline</span>
+                <span className="text-lg font-bold text-surface-100 mt-0.5 block">{currentDeadline ? fmt(currentDeadline) : "No deadline set"}</span>
+              </div>
+              <span className="text-xs text-surface-400 text-right">
+                {currentWorkingDays !== null && currentWorkingDays > 0 ? `${currentWorkingDays} working days` : "—"}
+              </span>
+            </div>
+
+            {/* 2. Remaining Tasks */}
+            <div className="p-3.5 rounded-xl bg-surface-800/50 border border-surface-700/40 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Remaining Tasks</span>
+                <span className="text-lg font-bold text-surface-100 mt-0.5 block">{currentRemainingTasks}</span>
+              </div>
+              <span className="text-xs text-right">
+                {tasksMissingEstimates > 0 ? (
+                  <span className="text-warning-400 font-medium">⚠️ {tasksMissingEstimates} unestimated</span>
+                ) : (
+                  <span className="text-success-400 font-medium">✓ All tasks estimated</span>
+                )}
+              </span>
+            </div>
+
+            {/* 3. Available Developer Capacity */}
+            <div className="p-3.5 rounded-xl bg-surface-800/50 border border-surface-700/40 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Available Capacity</span>
+                <span className="text-lg font-bold text-surface-100 mt-0.5 block">
+                  {currentAvailableCapacity !== null ? `${currentAvailableCapacity} hrs` : "—"}
+                </span>
+              </div>
+              <span className="text-xs text-surface-400 text-right">
+                {currentWorkingDays > 0 ? `Across ${currentWorkingDays} working days` : "Current capacity"}
+              </span>
+            </div>
+
+            {/* 4. Estimated Effort Required */}
+            <div className="p-3.5 rounded-xl bg-surface-800/50 border border-surface-700/40 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Estimated Effort Required</span>
+                <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                  <span className="text-lg font-bold text-surface-100">
+                    {currentEffort !== null ? `${currentEffort} hrs` : "—"}
+                  </span>
+                  {tasksMissingEstimates > 0 && (
+                    <span className="text-[11px] text-warning-400 font-medium bg-warning-500/10 px-2 py-0.5 rounded border border-warning-500/20">
+                      Unavailable — effort estimates missing
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span className="text-xs text-surface-400 text-right">
+                {tasksMissingEstimates > 0 ? `${tasksWithEstimates} of ${currentRemainingTasks} estimated` : "Total pending scope"}
+              </span>
+            </div>
+
+            {/* 5. Capacity Gap */}
+            <div className="p-3.5 rounded-xl bg-surface-800/50 border border-surface-700/40 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Capacity Gap</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {tasksMissingEstimates > 0 ? (
+                    <span className="text-xs text-warning-400 font-semibold bg-warning-500/10 px-2.5 py-1 rounded border border-warning-500/20">
+                      Unavailable — effort estimates missing
+                    </span>
+                  ) : currentCapacityGap !== null ? (
+                    <span className={`text-lg font-bold ${currentCapacityGap >= 0 ? "text-success-400" : "text-danger-400"}`}>
+                      {currentCapacityGap > 0 ? `+${currentCapacityGap} hrs` : `${currentCapacityGap} hrs`}
+                    </span>
+                  ) : (
+                    <span className="text-lg font-bold text-surface-400">—</span>
+                  )}
+                </div>
+              </div>
+              <span className="text-xs text-surface-400 text-right">
+                {tasksMissingEstimates > 0
+                  ? "Add estimates to calculate"
+                  : currentCapacityGap !== null
+                    ? (currentCapacityGap > 0 ? "Capacity surplus" : (currentCapacityGap === 0 ? "Exact match" : `Shortfall of ${Math.abs(currentCapacityGap)}h`))
+                    : "—"}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="lg:col-span-2">
-          {result ? (
-            <div className="space-y-4">
-              <div className="bg-primary-500/10 border border-primary-500/20 text-primary-300 p-4 rounded-xl flex items-start gap-3">
-                <span className="text-xl">✨</span>
-                <div>
-                  <h4 className="font-semibold text-sm">Simulation Complete (Read-Only)</h4>
-                  <p className="text-xs mt-1 text-primary-400/80">
-                    Comparing verified current baseline against your proposed hypothetical scenario. No project data was modified.
-                  </p>
+        {/* HYPOTHETICAL PANEL */}
+        <div className="glass-card p-6 rounded-2xl border border-primary-500/40 bg-primary-950/10 flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-primary-500/30">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-primary-400 animate-pulse"></span>
+              <h3 className="text-base font-bold text-primary-300 tracking-wide">HYPOTHETICAL</h3>
+            </div>
+            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded bg-primary-500/15 text-primary-300 border border-primary-500/30">
+              Proposed Scenario
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {/* 1. Proposed Deadline */}
+            <div className="p-3.5 rounded-xl bg-surface-800/60 border border-primary-500/20 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Proposed Deadline</span>
+                <span className="text-lg font-bold text-primary-300 mt-0.5 block">
+                  {hypotheticalDeadline ? fmt(hypotheticalDeadline) : "Select a proposed date"}
+                </span>
+              </div>
+              <span className="text-xs text-surface-400 text-right">
+                {hypotheticalWorkingDays !== null && hypotheticalDeadline ? `${hypotheticalWorkingDays} working days` : "—"}
+              </span>
+            </div>
+
+            {/* 2. Remaining Tasks */}
+            <div className="p-3.5 rounded-xl bg-surface-800/60 border border-primary-500/20 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Remaining Tasks</span>
+                <span className="text-lg font-bold text-surface-100 mt-0.5 block">{hypotheticalRemainingTasks}</span>
+              </div>
+              <span className="text-xs text-surface-400 text-right">
+                Same project scope
+              </span>
+            </div>
+
+            {/* 3. Available Capacity */}
+            <div className="p-3.5 rounded-xl bg-surface-800/60 border border-primary-500/20 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Available Capacity</span>
+                <span className="text-lg font-bold text-surface-100 mt-0.5 block">
+                  {hypotheticalCapacity !== null ? `${hypotheticalCapacity} hrs` : "—"}
+                </span>
+              </div>
+              <span className="text-xs text-surface-400 text-right">
+                {hypotheticalWorkingDays > 0 ? `Across ${hypotheticalWorkingDays} working days` : "Recalculated"}
+              </span>
+            </div>
+
+            {/* 4. Estimated Effort Required */}
+            <div className="p-3.5 rounded-xl bg-surface-800/60 border border-primary-500/20 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Estimated Effort Required</span>
+                <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                  <span className="text-lg font-bold text-surface-100">
+                    {hypotheticalEffort !== null ? `${hypotheticalEffort} hrs` : "—"}
+                  </span>
+                  {tasksMissingEstimates > 0 && (
+                    <span className="text-[11px] text-warning-400 font-medium bg-warning-500/10 px-2 py-0.5 rounded border border-warning-500/20">
+                      Unavailable — effort estimates missing
+                    </span>
+                  )}
                 </div>
               </div>
+              <span className="text-xs text-surface-400 text-right">
+                Same project scope
+              </span>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="glass-card p-5">
-                  <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider mb-4 flex items-center justify-between">
-                    <span>✓ Verified Baseline</span>
-                    {result.baseline.working_days !== undefined && (
-                      <span className="text-xs font-normal text-surface-400">
-                        {result.baseline.working_days} working days
-                      </span>
-                    )}
-                  </h3>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <p className="text-surface-500 text-xs">Current Deadline</p>
-                      <p className="font-semibold text-surface-100">
-                        {result.baseline.current_deadline ? fmt(result.baseline.current_deadline) : "None set"}
-                        {result.baseline.working_days !== undefined && (
-                          <span className="text-xs text-surface-400 font-normal ml-2">({result.baseline.working_days} working days)</span>
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-surface-500 text-xs">Remaining Tasks</p>
-                      <p className="font-semibold text-surface-100">{result.baseline.remaining_tasks}</p>
-                    </div>
-                    <div>
-                      <p className="text-surface-500 text-xs">Remaining Effort</p>
-                      <p className="font-semibold text-surface-100">
-                        {result.baseline.remaining_estimated_effort_hours !== null ? (
-                          <>
-                            <span>{result.baseline.remaining_estimated_effort_hours} hours</span>
-                            {result.baseline.tasks_missing_estimates ? (
-                              <span className="block text-warning-400 text-xs font-normal mt-0.5">
-                                ⚠️ Partial: {result.baseline.tasks_missing_estimates} of {result.baseline.remaining_tasks} tasks lack estimates
-                              </span>
-                            ) : (
-                              <span className="block text-success-400 text-xs font-normal mt-0.5">
-                                ✓ All {result.baseline.remaining_tasks} tasks estimated
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-surface-500 italic text-xs">Unavailable — no effort estimates recorded</span>
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-surface-500 text-xs">Available Capacity</p>
-                      <p className="font-semibold text-surface-100">
-                        {result.baseline.available_capacity_hours} hours
-                        {result.baseline.developers_missing_capacity ? (
-                          <span className="block text-warning-400 text-xs font-normal mt-0.5">
-                            ⚠️ {result.baseline.developers_missing_capacity} assigned developers lack weekly capacity
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="glass-card p-5 border-warning-500/30">
-                  <h3 className="text-xs font-bold text-warning-400 uppercase tracking-wider mb-4 flex items-center justify-between">
-                    <span>📅 Hypothetical Scenario</span>
-                    {result.scenario.working_days !== undefined && (
-                      <span className="text-xs font-normal text-warning-300">
-                        {result.scenario.working_days} working days
-                      </span>
-                    )}
-                  </h3>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <p className="text-surface-500 text-xs">Proposed Deadline</p>
-                      <p className="font-semibold text-warning-300">
-                        {fmt(result.scenario.proposed_deadline)}
-                        {result.scenario.working_days !== undefined && (
-                          <span className="text-xs text-surface-400 font-normal ml-2">({result.scenario.working_days} working days)</span>
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-surface-500 text-xs">Remaining Tasks</p>
-                      <p className="font-semibold text-surface-100">{result.scenario.remaining_tasks}</p>
-                    </div>
-                    <div>
-                      <p className="text-surface-500 text-xs">Capacity Gap</p>
-                      <p className={`font-semibold ${
-                        result.scenario.capacity_gap_hours !== null && result.scenario.capacity_gap_hours > 0
-                          ? "text-danger-400"
-                          : result.scenario.capacity_gap_hours === 0
-                          ? "text-success-400"
-                          : "text-emerald-400"
-                      }`}>
-                        {result.scenario.capacity_gap_hours !== null ? (
-                          <>
-                            {result.scenario.capacity_gap_hours > 0 ? `+${result.scenario.capacity_gap_hours} hours (Deficit)` : `${result.scenario.capacity_gap_hours} hours (Surplus)`}
-                            <span className="block text-[11px] text-surface-500 font-mono font-normal mt-0.5">
-                              Formula: Effort ({result.scenario.remaining_estimated_effort_hours ?? "?"}h) − Capacity ({result.scenario.available_capacity_hours}h)
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-surface-500 italic text-xs">Cannot calculate — missing effort or capacity data</span>
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-surface-500 text-xs">Available Capacity</p>
-                      <p className="font-semibold text-surface-100">{result.scenario.available_capacity_hours} hours</p>
-                    </div>
-                  </div>
+            {/* 5. Capacity Gap */}
+            <div className="p-3.5 rounded-xl bg-surface-800/60 border border-primary-500/20 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Capacity Gap</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {tasksMissingEstimates > 0 ? (
+                    <span className="text-xs text-warning-400 font-semibold bg-warning-500/10 px-2.5 py-1 rounded border border-warning-500/20">
+                      Unavailable — effort estimates missing
+                    </span>
+                  ) : hypotheticalCapacityGap !== null ? (
+                    <span className={`text-lg font-bold ${hypotheticalCapacityGap >= 0 ? "text-success-400" : "text-danger-400"}`}>
+                      {hypotheticalCapacityGap > 0 ? `+${hypotheticalCapacityGap} hrs` : `${hypotheticalCapacityGap} hrs`}
+                    </span>
+                  ) : (
+                    <span className="text-lg font-bold text-surface-400">—</span>
+                  )}
                 </div>
               </div>
-
-              {result.scenario.missing_data_items && result.scenario.missing_data_items.length > 0 && (
-                <div className="bg-warning-500/10 border border-warning-500/20 text-warning-300 p-4 rounded-xl text-xs space-y-1.5">
-                  <div className="font-semibold flex items-center gap-2">
-                    <span>⚠️</span><span>Data Inputs Missing for Complete Calculation:</span>
-                  </div>
-                  <ul className="list-disc list-inside space-y-0.5 pl-2 text-warning-300/90">
-                    {result.scenario.missing_data_items.map((item, idx) => (
-                      <li key={idx}>{item}</li>
-                    ))}
-                  </ul>
-                  <p className="text-[11px] text-warning-400/90 pt-1">
-                    💡 Click <strong>"Manage Estimates & Capacity"</strong> above to enter missing estimates or developer capacities.
-                  </p>
-                </div>
-              )}
-
-              {result.scenario.schedule_concerns.length > 0 && (
-                <div className="glass-card p-5">
-                  <h3 className="font-bold text-surface-100 mb-3 text-sm">⚠️ Schedule Concerns</h3>
-                  <ul className="space-y-2">
-                    {result.scenario.schedule_concerns.map((c, i) => (
-                      <li key={i} className="flex items-start gap-2 bg-warning-500/10 p-3 rounded border border-warning-500/20 text-xs text-warning-300">
-                        <span className="shrink-0">⚠️</span><span>{c}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {result.ai_explanation && (
-                <div className="glass-card p-5 border-accent-500/30">
-                  <h3 className="font-bold text-accent-400 mb-3 text-sm">⚡ AI Insights</h3>
-                  <p className="text-surface-200 text-sm whitespace-pre-wrap leading-relaxed">{result.ai_explanation}</p>
-                </div>
-              )}
-
-              {result.assumptions_and_limitations.length > 0 && (
-                <div className="glass-card p-4 border-dashed border-surface-700/60 bg-surface-800/20">
-                  <h4 className="font-bold text-surface-500 text-xs mb-2 uppercase tracking-wider">ℹ️ Limitations &amp; Unavailable Data</h4>
-                  <ul className="list-disc list-inside space-y-1 text-xs text-surface-600">
-                    {result.assumptions_and_limitations.map((l, i) => <li key={i}>{l}</li>)}
-                  </ul>
-                </div>
-              )}
+              <span className="text-xs text-surface-400 text-right">
+                {tasksMissingEstimates > 0
+                  ? "Add estimates to calculate"
+                  : hypotheticalCapacityGap !== null
+                    ? (hypotheticalCapacityGap > 0 ? "Capacity surplus" : (hypotheticalCapacityGap === 0 ? "Exact match" : `Shortfall of ${Math.abs(hypotheticalCapacityGap)}h`))
+                    : "Run simulation to calculate"}
+              </span>
             </div>
-          ) : (
-            <div className="glass-card h-full min-h-[300px] flex flex-col items-center justify-center p-8 text-center border-dashed border-surface-700/60">
-              <span className="text-5xl mb-4">🔬</span>
-              <h3 className="text-lg font-bold text-surface-300 mb-2">Configure Simulation</h3>
-              <p className="text-sm text-surface-500 max-w-sm">
-                Enter a proposed deadline and click Run Simulation to see the hypothetical impact.
-                No real data will be changed.
-              </p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
+
+      {/* Concise Impact Comparison Section */}
+      <div className="glass-card p-5 rounded-2xl border border-surface-700/60 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-surface-700/50">
+          <div className="flex items-center gap-2">
+            <span className="text-primary-400 text-base">⚡</span>
+            <h3 className="text-sm font-bold text-surface-100 uppercase tracking-wider">Impact Comparison</h3>
+          </div>
+          <span className="text-xs text-surface-400">
+            Net difference between Current and Proposed Scenario
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 1. Deadline Difference */}
+          <div className="p-4 rounded-xl bg-surface-800/40 border border-surface-700/50 flex flex-col justify-between min-h-[105px]">
+            <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider">Deadline Difference</span>
+            <div className="mt-1">
+              {daysDiff === null ? (
+                <span className="text-lg font-bold text-surface-400">—</span>
+              ) : daysDiff < 0 ? (
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-lg font-bold text-warning-400">Earlier by {Math.abs(daysDiff)} days</span>
+                  <span className="text-xs text-warning-400/80 font-medium">({Math.abs(daysDiff)} working days)</span>
+                </div>
+              ) : daysDiff > 0 ? (
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-lg font-bold text-primary-300">Later by {daysDiff} days</span>
+                  <span className="text-xs text-primary-300/80 font-medium">(+{daysDiff} working days)</span>
+                </div>
+              ) : (
+                <span className="text-lg font-bold text-surface-200">0 days (Same date)</span>
+              )}
+            </div>
+            <span className="text-[11px] text-surface-400 mt-1">
+              {currentWorkingDays}d current → {hypotheticalWorkingDays}d proposed
+            </span>
+          </div>
+
+          {/* 2. Available-Capacity Difference */}
+          <div className="p-4 rounded-xl bg-surface-800/40 border border-surface-700/50 flex flex-col justify-between min-h-[105px]">
+            <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider">Available Capacity Difference</span>
+            <div className="mt-1">
+              {capacityDiff === null ? (
+                <span className="text-lg font-bold text-surface-400">—</span>
+              ) : capacityDiff < 0 ? (
+                <span className="text-lg font-bold text-danger-400">
+                  {capacityDiff} hrs <span className="text-xs font-normal">↓ reduction</span>
+                </span>
+              ) : capacityDiff > 0 ? (
+                <span className="text-lg font-bold text-success-400">
+                  +{capacityDiff} hrs <span className="text-xs font-normal">↑ capacity</span>
+                </span>
+              ) : (
+                <span className="text-lg font-bold text-surface-200">0 hrs (No change)</span>
+              )}
+            </div>
+            <span className="text-[11px] text-surface-400 mt-1">
+              {currentAvailableCapacity !== null ? `${currentAvailableCapacity}h` : "—"} → {hypotheticalCapacity !== null ? `${hypotheticalCapacity}h` : "—"}
+            </span>
+          </div>
+
+          {/* 3. Capacity-Gap Difference */}
+          <div className="p-4 rounded-xl bg-surface-800/40 border border-surface-700/50 flex flex-col justify-between min-h-[105px]">
+            <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider">Capacity Gap Difference</span>
+            <div className="mt-1">
+              {tasksMissingEstimates > 0 ? (
+                <span className="text-xs font-semibold text-warning-400">Unavailable — effort estimates missing</span>
+              ) : gapDiff === null ? (
+                <span className="text-lg font-bold text-surface-400">—</span>
+              ) : gapDiff < 0 ? (
+                <span className="text-lg font-bold text-danger-400">
+                  {gapDiff} hrs <span className="text-xs font-normal">↓ tighter buffer</span>
+                </span>
+              ) : gapDiff > 0 ? (
+                <span className="text-lg font-bold text-success-400">
+                  +{gapDiff} hrs <span className="text-xs font-normal">↑ larger buffer</span>
+                </span>
+              ) : (
+                <span className="text-lg font-bold text-surface-200">0 hrs (Neutral)</span>
+              )}
+            </div>
+            <span className="text-[11px] text-surface-400 mt-1">
+              {tasksMissingEstimates > 0
+                ? "Requires all task estimates"
+                : `${currentCapacityGap !== null ? (currentCapacityGap > 0 ? `+${currentCapacityGap}h` : `${currentCapacityGap}h`) : "—"} → ${hypotheticalCapacityGap !== null ? (hypotheticalCapacityGap > 0 ? `+${hypotheticalCapacityGap}h` : `${hypotheticalCapacityGap}h`) : "—"}`}
+            </span>
+          </div>
+
+          {/* 4. Feasibility Result */}
+          <div className={`p-4 rounded-xl border flex flex-col justify-between min-h-[105px] ${feasibilityBadge ? `${feasibilityBadge.bgClass} ${feasibilityBadge.borderClass}` : "bg-surface-800/40 border-surface-700/50"}`}>
+            <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider">Feasibility Result</span>
+            <div className="mt-1">
+              {feasibilityBadge ? (
+                <span className={`text-base font-bold ${feasibilityBadge.colorClass}`}>
+                  {feasibilityBadge.label}
+                </span>
+              ) : (
+                <span className="text-base font-bold text-surface-400">—</span>
+              )}
+            </div>
+            <span className="text-[11px] text-surface-300 mt-1 truncate">
+              {feasibilityBadge?.subtext ?? "Select deadline to evaluate"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {result?.ai_explanation && (
+        <div className="glass-card p-5 border-accent-500/30">
+          <h3 className="font-bold text-accent-400 mb-3 text-sm flex items-center gap-2">
+            <span>⚡</span> AI Insights
+          </h3>
+          <p className="text-surface-200 text-sm whitespace-pre-wrap leading-relaxed">{result.ai_explanation}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1515,6 +1786,42 @@ export default function ProjectDetailPage() {
   const activeTab: Tab = visibleTabs.some((t) => t.id === rawTab) ? rawTab! : "overview";
   const setTab = (t: Tab) => setSearchParams({ tab: t });
 
+  const isAdmin = profile?.role === "ADMIN";
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else if (profile?.role === "MANAGER") {
+      navigate("/dashboard/pm-projects");
+    } else if (profile?.role === "ADMIN") {
+      navigate("/dashboard/projects");
+    } else {
+      navigate("/dashboard/my-projects");
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!project) return;
+    setDeleting(true);
+    try {
+      await deleteProject(project.id);
+      if (profile?.role === "MANAGER") {
+        navigate("/dashboard/pm-projects");
+      } else if (profile?.role === "ADMIN") {
+        navigate("/dashboard/projects");
+      } else {
+        navigate("/dashboard/my-projects");
+      }
+    } catch (e: any) {
+      setErr(e.message || "Failed to delete project");
+      setShowDeleteModal(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (!projectId) return <div className="p-8 text-center text-surface-400">No project selected.</div>;
 
   if (loading) return (
@@ -1527,36 +1834,27 @@ export default function ProjectDetailPage() {
 
   if (err || !project) return (
     <div className="space-y-4">
-      <button onClick={() => navigate(-1)} className="btn-secondary text-sm px-4 py-2">← Back</button>
+      <button onClick={handleBack} className="btn-secondary text-sm px-4 py-2">← Back</button>
       <div className="bg-danger-500/10 border border-danger-500/20 text-danger-400 p-5 rounded-xl">{err || "Project not found."}</div>
     </div>
   );
-
-  const isAdmin = profile?.role === "ADMIN";
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  const handleDeleteProject = async () => {
-    if (!project) return;
-    setDeleting(true);
-    try {
-      await deleteProject(project.id);
-      navigate("/dashboard/projects");
-    } catch (e: any) {
-      setErr(e.message || "Failed to delete project");
-      setShowDeleteModal(false);
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
-        <button onClick={() => navigate(-1)} className="text-surface-400 hover:text-surface-200 transition-colors">←</button>
+        <button onClick={handleBack} className="text-surface-400 hover:text-surface-200 transition-colors">←</button>
         <span className="text-surface-600">/</span>
-        <span className="text-surface-400">Projects</span>
+        <button
+          onClick={() => {
+            if (profile?.role === "MANAGER") navigate("/dashboard/pm-projects");
+            else if (profile?.role === "ADMIN") navigate("/dashboard/projects");
+            else navigate("/dashboard/my-projects");
+          }}
+          className="text-surface-400 hover:text-surface-200 transition-colors"
+        >
+          Projects
+        </button>
         <span className="text-surface-600">/</span>
         <span className="text-surface-200 font-medium truncate">{project.name}</span>
       </div>
@@ -1568,7 +1866,7 @@ export default function ProjectDetailPage() {
           {project.description && <p className="text-surface-400 text-sm mt-1">{project.description}</p>}
         </div>
         <div className="flex items-center gap-3">
-          <span className={statusBadge(project.status)}>{project.status.replace("_", " ")}</span>
+          <span className={statusBadge(project.status)}>{(project.status || "planning").replace("_", " ")}</span>
           {isAdmin && (
             <button
               onClick={() => setShowDeleteModal(true)}

@@ -272,6 +272,40 @@ function MarkdownMessage({ content }: { content: string }) {
 // Main AI Continuity Page
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Sanitize any technical or internal error details so users never see model tags, timeouts, or stack traces
+export function sanitizeAiErrorMessage(err: any): string {
+  const raw = typeof err === "string" ? err : err?.message || "";
+  const lower = raw.toLowerCase();
+
+  if (lower.includes("abort") || lower.includes("cancel") || lower.includes("stopped")) {
+    return "Response generation was stopped.";
+  }
+  if (
+    lower.includes("timeout") ||
+    lower.includes("timed out") ||
+    lower.includes("504") ||
+    lower.includes("too long")
+  ) {
+    return "I couldn't generate a response right now. Please try again.";
+  }
+  if (
+    lower.includes("unavailable") ||
+    lower.includes("503") ||
+    lower.includes("connection") ||
+    lower.includes("refused") ||
+    lower.includes("econnrefused")
+  ) {
+    return "The AI service is currently unavailable. Please check that Ollama is running and try again.";
+  }
+  if (lower.includes("403") || lower.includes("permission") || lower.includes("forbidden")) {
+    return "You do not have permission to access this project's records.";
+  }
+  if (lower.includes("404") || lower.includes("not found")) {
+    return "The requested project or resource was not found.";
+  }
+  return "I couldn't generate a response right now. Please try again.";
+}
+
 export default function AIContinuityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -303,7 +337,7 @@ export default function AIContinuityPage() {
   const [showContextDrawer, setShowContextDrawer] = useState(false);
 
   // AI Service Status (verified silently in background)
-  const [aiStatus, setAiStatus] = useState<AIStatusResponse | null>(null);
+  const [_aiStatus, setAiStatus] = useState<AIStatusResponse | null>(null);
 
   // Chat state per project (preserves history when switching projects)
   const [chatHistoryByProject, setChatHistoryByProject] = useState<Record<string, ChatMessageItem[]>>({});
@@ -311,7 +345,6 @@ export default function AIContinuityPage() {
   const [asking, setAsking] = useState(false);
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // Interactive Checklist check state
   const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({});
@@ -381,7 +414,7 @@ export default function AIContinuityPage() {
       setAiStatus({
         provider: "ollama",
         model: "llama3.2:1b",
-        status: "ready",
+        status: "unavailable",
       });
     }
   }, []);
@@ -415,14 +448,15 @@ export default function AIContinuityPage() {
     if (!selectedProjectId) return;
     setLoadingSummary(true);
     setSummaryError(null);
+    // Instantly remove tentative inference warning when user clicks Generate AI Summary
+    setSummary((prev) => (prev ? { ...prev, is_preliminary_inference: false, inference_rationale: undefined } : null));
     try {
       const token = localStorage.getItem("access_token") || "";
       const result = await generateContinuitySummary(selectedProjectId, token);
-      setSummary(result);
+      setSummary({ ...result, is_preliminary_inference: false, inference_rationale: undefined });
       setSummarySource("ai");
     } catch (err: any) {
-      const msg = err.message || "Failed to generate project summary";
-      setSummaryError(msg);
+      setSummaryError(sanitizeAiErrorMessage(err));
       if (err.raw_context && !summary) {
         setSummary({
           project_overview: "Project overview synthesized from verified engineering records and active repository telemetry.",
@@ -436,6 +470,7 @@ export default function AIContinuityPage() {
           what_next_developer_should_know: "Review verified task records.",
           recommended_next_steps: "Review open tasks.",
           raw_context: err.raw_context,
+          is_preliminary_inference: false,
         });
         setSummarySource("briefing");
       }
@@ -518,7 +553,12 @@ export default function AIContinuityPage() {
         );
       } catch (streamErr: any) {
         if (controller.signal.aborted) throw streamErr;
-        // Fallback to non-streaming if stream encounters an issue
+        const sErrLower = String(streamErr?.message || "").toLowerCase();
+        // If stream explicitly timed out or service is unavailable, do not repeat the request
+        if (sErrLower.includes("timed out") || sErrLower.includes("timeout") || sErrLower.includes("504") || sErrLower.includes("503") || sErrLower.includes("unavailable")) {
+          throw streamErr;
+        }
+        // Fallback to non-streaming if stream encounters a network/connection decode glitch
         const fallbackRes = await askContinuityQuestion(
           selectedProjectId,
           currentQ,
@@ -557,50 +597,10 @@ export default function AIContinuityPage() {
         return;
       }
 
-      // Seamless intelligent recovery: grounded in verified project records and handover telemetry
-      const activeProjectName = projects.find((p) => p.id === selectedProjectId)?.name || "this project";
-      const qLower = currentQ.toLowerCase();
+      // Record question to allow immediate clean retry
+      setLastFailedQuestion(currentQ);
 
-      let intelligentAnswer = "";
-      if (summary) {
-        if (qLower.includes("next") || qLower.includes("first") || qLower.includes("work") || qLower.includes("action") || qLower.includes("do")) {
-          intelligentAnswer = `### Priority Developer Focus & Next Steps\n\n` +
-            `Based on verified project intelligence for **${activeProjectName}**:\n\n` +
-            `* **In-Progress Deliverables**: ${summary.current_work || "Review active sprint deliverables."}\n` +
-            `* **Pending Tasks & Handover Items**: ${summary.pending_work || "Review open backlog items and pull requests."}\n` +
-            `* **Recommended Next Focus**: ${summary.recommended_next_steps || summary.what_next_developer_should_know || "Execute in-flight tasks and verify CI/CD pipelines."}\n\n` +
-            `*(Grounded in verified project records and engineering telemetry)*`;
-        } else if (qLower.includes("handover") || qLower.includes("overview") || qLower.includes("status")) {
-          intelligentAnswer = `### Project Continuity & Handover Overview\n\n` +
-            `* **Scope & Purpose**: ${summary.project_overview || "Project continuity workspace is active."}\n` +
-            `* **Completed Deliverables**: ${summary.previous_developer_work || "Sprint milestones verified in system records."}\n` +
-            `* **Active Work in Progress**: ${summary.current_work || "Tasks currently tracking to plan."}\n` +
-            `* **Items Requiring Attention**: ${summary.blocked_overdue_work || "No critical blockers currently flagged."}\n\n` +
-            `*(Grounded in verified project records and engineering telemetry)*`;
-        } else if (qLower.includes("blocker") || qLower.includes("risk") || qLower.includes("issue")) {
-          intelligentAnswer = `### Active Risks & Blockers Assessment\n\n` +
-            `* **Attention Required**: ${summary.blocked_overdue_work || "No verified overdue tasks or critical workflow blockers."}\n` +
-            `* **Known Issues**: ${summary.known_issues || "All open issues are within expected tolerances."}\n\n` +
-            `*(Grounded in verified project records and engineering telemetry)*`;
-        } else if (qLower.includes("previous") || qLower.includes("complete") || qLower.includes("done")) {
-          intelligentAnswer = `### Completed Deliverables & Prior Work\n\n` +
-            `* **Previous Developer Work**: ${summary.previous_developer_work || "Previous features and schemas successfully merged."}\n` +
-            `* **Recent Activity**: ${summary.recent_github_activity || "Repository commits and pull requests tracked in database."}\n\n` +
-            `*(Grounded in verified project records and engineering telemetry)*`;
-        } else {
-          intelligentAnswer = `### Project Intelligence Analysis\n\n` +
-            `Here is the verified status for **${activeProjectName}** regarding "${currentQ}":\n\n` +
-            `* **Project Status**: ${summary.project_overview || "Active and healthy."}\n` +
-            `* **Current Progress**: ${summary.current_work || "Sprint tasks in progress."}\n` +
-            `* **Recommended Action**: ${summary.recommended_next_steps || "Consult the Handover Intelligence Dossier for detailed specifications."}\n\n` +
-            `*(Grounded in verified project records and engineering telemetry)*`;
-        }
-      } else {
-        intelligentAnswer = `### Project Intelligence Analysis\n\n` +
-          `Project continuity records for **${activeProjectName}** are synchronized with active database telemetry. ` +
-          `You can inspect the **Handover Intelligence Dossier** for complete breakdowns of developer takeaways, active sprint items, attention items, and repository telemetry.\n\n` +
-          `*(Grounded in verified project records and engineering telemetry)*`;
-      }
+      const friendlyMsg = sanitizeAiErrorMessage(err);
 
       setChatHistoryByProject((prev) => {
         const list = prev[projectKey] || [];
@@ -610,8 +610,8 @@ export default function AIContinuityPage() {
             m.id === aiMsgId
               ? {
                   ...m,
-                  text: intelligentAnswer,
-                  isError: false,
+                  text: friendlyMsg,
+                  isError: true,
                 }
               : m
           ),
@@ -620,6 +620,22 @@ export default function AIContinuityPage() {
     } finally {
       setAsking(false);
       abortControllerRef.current = null;
+      // Guarantee loading state never hangs forever
+      setChatHistoryByProject((prev) => {
+        const list = prev[projectKey] || [];
+        return {
+          ...prev,
+          [projectKey]: list.map((m) =>
+            m.id === aiMsgId && !m.text.trim()
+              ? {
+                  ...m,
+                  text: "I couldn't generate a response right now. Please try again.",
+                  isError: true,
+                }
+              : m
+          ),
+        };
+      });
       textareaRef.current?.focus();
     }
   };
@@ -1032,7 +1048,7 @@ export default function AIContinuityPage() {
                     {summarySource === "ai" ? "Grounded AI Model" : "System Records"}
                   </span>
                 </div>
-                <p className="text-surface-200 text-xs sm:text-sm leading-relaxed">{summary.project_overview}</p>
+                <p className="text-surface-200 text-xs sm:text-sm leading-relaxed whitespace-pre-line">{summary.project_overview}</p>
               </div>
             )}
 
@@ -1310,8 +1326,9 @@ export default function AIContinuityPage() {
                   {/* Card 1: Project Overview */}
                   <button
                     type="button"
+                    disabled={asking}
                     onClick={() => handleAsk("What is the current project status and overview?")}
-                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-primary-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-primary-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer"
+                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-primary-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-primary-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div>
                       <div className="flex items-center justify-between mb-2.5">
@@ -1339,8 +1356,9 @@ export default function AIContinuityPage() {
                   {/* Card 2: Previous Developer Work */}
                   <button
                     type="button"
+                    disabled={asking}
                     onClick={() => handleAsk("What did the previous developer complete?")}
-                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-emerald-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-emerald-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer"
+                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-emerald-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-emerald-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div>
                       <div className="flex items-center justify-between mb-2.5">
@@ -1368,8 +1386,9 @@ export default function AIContinuityPage() {
                   {/* Card 3: Current Work */}
                   <button
                     type="button"
+                    disabled={asking}
                     onClick={() => handleAsk("What is the current work in progress and active team focus?")}
-                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-amber-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-amber-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer"
+                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-amber-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-amber-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div>
                       <div className="flex items-center justify-between mb-2.5">
@@ -1397,8 +1416,9 @@ export default function AIContinuityPage() {
                   {/* Card 4: Pending Work */}
                   <button
                     type="button"
+                    disabled={asking}
                     onClick={() => handleAsk("What work is still pending and which tasks have been pending for a long time?")}
-                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-indigo-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-indigo-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer"
+                    className="p-4 rounded-xl bg-surface-900/70 hover:bg-surface-850/90 border border-surface-800/90 hover:border-indigo-500/50 text-left transition-all duration-200 group shadow-lg hover:shadow-indigo-500/10 flex flex-col justify-between min-h-[140px] backdrop-blur-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div>
                       <div className="flex items-center justify-between mb-2.5">
@@ -1486,63 +1506,22 @@ export default function AIContinuityPage() {
                           {msg.text}
                         </p>
                       ) : msg.isError ? (
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           <div className="flex items-start gap-2.5">
                             <div className="p-1.5 rounded-lg bg-danger-500/20 text-danger-400 shrink-0 mt-0.5">
                               <AlertTriangle className="w-4 h-4" />
                             </div>
-                            <div className="space-y-1">
-                              <h4 className="text-xs font-semibold text-danger-200 tracking-wide uppercase">
-                                AI Service Notice
-                              </h4>
+                            <div className="space-y-1 flex-1">
                               <p className="text-sm text-surface-200 leading-relaxed font-normal">
                                 {msg.text.replace(/^⚠️\s*/, "")}
                               </p>
                             </div>
                           </div>
-
-                          {/* Collapsible Diagnostic Details */}
-                          <div className="pt-2 border-t border-danger-500/20">
-                            <button
-                              type="button"
-                              onClick={() => setShowDiagnostics((prev) => !prev)}
-                              className="text-[11px] text-surface-400 hover:text-surface-200 flex items-center gap-1 transition-colors"
-                            >
-                              {showDiagnostics ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                              <span>{showDiagnostics ? "Hide diagnostic details" : "View technical diagnostics"}</span>
-                            </button>
-
-                            {showDiagnostics && (
-                              <div className="mt-2 p-2.5 rounded-lg bg-surface-950/80 border border-surface-800/80 text-[11px] font-mono text-surface-300 space-y-1">
-                                <div className="flex justify-between">
-                                  <span className="text-surface-400">Provider:</span>
-                                  <span className="text-surface-200 font-semibold">{aiStatus?.provider || "ollama"}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-surface-400">Target Model:</span>
-                                  <span className="text-surface-200 font-semibold">{aiStatus?.model || "llama3.2:1b"}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-surface-400">Daemon Endpoint:</span>
-                                  <span className="text-surface-200 font-semibold">http://localhost:11434</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-surface-400">Status:</span>
-                                  <span className="text-amber-400 font-semibold">{aiStatus?.status || "unavailable"}</span>
-                                </div>
-                                {(aiStatus?.error || aiStatus?.health?.error) && (
-                                  <div className="pt-1 text-danger-400 text-[10px] break-all border-t border-surface-800">
-                                    {aiStatus.error || aiStatus.health?.error}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
                         </div>
                       ) : msg.text === "" ? (
-                        <div className="flex items-center gap-2 py-1 text-surface-400 text-xs">
-                          <span className="w-2 h-2 rounded-full bg-primary-400 animate-ping" />
-                          <span>DevFlow AI is thinking...</span>
+                        <div className="flex items-center gap-2.5 py-1 text-surface-400 text-xs font-medium">
+                          <span className="w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
+                          <span>Thinking...</span>
                         </div>
                       ) : (
                         <div className="relative">
@@ -1747,7 +1726,7 @@ export default function AIContinuityPage() {
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary-500/20 text-primary-300 border border-primary-500/30">
                     Phase 5 Developer Handover Dossier
                   </span>
-                  {summary?.is_preliminary_inference && (
+                  {summary?.is_preliminary_inference && summarySource !== "ai" && !loadingSummary && (
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-warning-500/20 text-warning-300 border border-warning-500/30 flex items-center gap-1">
                       <AlertTriangle className="w-3 h-3" /> Tentative AI Inference
                     </span>
@@ -1839,7 +1818,7 @@ export default function AIContinuityPage() {
               </div>
 
               {/* Tentative Inference Notice */}
-              {summary?.is_preliminary_inference && (
+              {summary?.is_preliminary_inference && summarySource !== "ai" && !loadingSummary && (
                 <div className="p-3.5 rounded-xl bg-warning-950/40 border border-warning-500/40 text-warning-200 text-xs flex items-start gap-2.5">
                   <AlertTriangle className="w-4 h-4 text-warning-400 shrink-0 mt-0.5" />
                   <div className="flex-1">
@@ -1858,7 +1837,7 @@ export default function AIContinuityPage() {
                 </div>
               )}
 
-              <p className="text-surface-200 text-sm leading-relaxed">
+              <p className="text-surface-200 text-sm leading-relaxed whitespace-pre-line">
                 {summary?.project_overview || "Project overview data is loading from the DevFlow database..."}
               </p>
 

@@ -173,16 +173,15 @@ export async function streamContinuityQuestion(
     });
 
     if (!response.ok) {
-      const fallback = await askContinuityQuestion(projectId, question, token, messages, signal);
-      if (onChunk) onChunk(fallback.answer);
-      return fallback.answer;
+      const errorBody = await response.json().catch(() => ({ detail: response.statusText }));
+      const detail = errorBody.detail;
+      const errorMsg = typeof detail === "string" ? detail : (detail?.message || `HTTP ${response.status}`);
+      throw new Error(errorMsg);
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      const fallback = await askContinuityQuestion(projectId, question, token, messages, signal);
-      if (onChunk) onChunk(fallback.answer);
-      return fallback.answer;
+      throw new Error("Unable to read streaming response from AI service.");
     }
 
     const decoder = new TextDecoder("utf-8");
@@ -218,20 +217,12 @@ export async function streamContinuityQuestion(
     }
 
     if (!accumulated.trim()) {
-      const fallback = await askContinuityQuestion(projectId, question, token, messages, signal);
-      if (onChunk) onChunk(fallback.answer);
-      return fallback.answer;
+      throw new Error("No response generated from AI service.");
     }
 
     return accumulated;
   } catch (err: any) {
-    if (err.name === "AbortError" || signal?.aborted) {
-      throw err;
-    }
-    // Graceful fallback to askContinuityQuestion on network/stream errors
-    const fallback = await askContinuityQuestion(projectId, question, token, messages, signal);
-    if (onChunk) onChunk(fallback.answer);
-    return fallback.answer;
+    throw err;
   }
 }
 export interface AIStatusResponse {

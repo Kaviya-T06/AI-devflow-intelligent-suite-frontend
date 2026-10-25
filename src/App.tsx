@@ -43,6 +43,7 @@ import TeamPresencePage from "./pages/dashboard/TeamPresencePage";
 import { PresenceProvider } from "./context/PresenceContext";
 import { useAuth } from "./context/AuthContext";
 import LoadingScreen from "./components/ui/LoadingScreen";
+import ErrorBoundary from "./components/ui/ErrorBoundary";
 
 function RootRoute() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -63,7 +64,8 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <PresenceProvider>
-        <Routes>
+          <ErrorBoundary>
+            <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -206,6 +208,7 @@ export default function App() {
           <Route path="/" element={<RootRoute />} />
           <Route path="*" element={<RootRoute />} />
         </Routes>
+          </ErrorBoundary>
         </PresenceProvider>
       </AuthProvider>
     </BrowserRouter>
