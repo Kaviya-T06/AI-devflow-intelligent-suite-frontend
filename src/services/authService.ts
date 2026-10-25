@@ -14,6 +14,7 @@ export interface RegisterPayload {
   password: string;
   fullName: string;
   role?: UserRole;
+  inviteCode?: string;
 }
 
 export interface LoginPayload {
@@ -83,12 +84,14 @@ export async function registerUser({
   password,
   fullName,
   role = "DEVELOPER",
+  inviteCode,
 }: RegisterPayload): Promise<{ user: AuthUser }> {
   const body = {
     name: fullName,
     email,
     password,
     role: ROLE_LABEL_MAP[role],
+    ...(inviteCode?.trim() ? { invite_code: inviteCode.trim() } : {}),
   };
 
   const res = await fetch(`${AUTH_BASE}/register`, {

@@ -277,6 +277,7 @@ function SignupFormStep({
     role: initialRole,
     password: "",
     confirmPassword: "",
+    inviteCode: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -316,6 +317,7 @@ function SignupFormStep({
         password: form.password,
         fullName: form.fullName.trim(),
         role: form.role,
+        inviteCode: form.inviteCode,
       });
       setSuccess(true);
     } catch (err: unknown) {
@@ -345,7 +347,7 @@ function SignupFormStep({
             Your account for <span className="text-primary-300 font-medium">{form.email}</span> has been created successfully.
           </p>
           <p className="text-surface-500 text-sm mb-8">
-            You can now sign in to access your developer workspace.
+            You can now sign in to access your workspace.
           </p>
           <button onClick={() => navigate("/login")} className="btn-primary w-full">
             Go to Sign In
@@ -492,6 +494,33 @@ function SignupFormStep({
                 ))}
               </div>
             </div>
+
+            {/* Authorization / Invite Code for Privileged Roles */}
+            {form.role !== "DEVELOPER" && (
+              <div className="bg-surface-800/80 border border-primary-500/30 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="reg-invite" className="input-label mb-0 text-primary-300 font-semibold">
+                    {form.role === "ADMIN" ? "Admin Authorization Code" : "Project Manager Invite Code"}
+                  </label>
+                  <span className="text-xs text-primary-400 font-medium">
+                    Required for {form.role === "ADMIN" ? "Admin" : "PM"}
+                  </span>
+                </div>
+                <input
+                  id="reg-invite"
+                  name="inviteCode"
+                  type="text"
+                  placeholder={form.role === "ADMIN" ? "Enter admin authorization code" : "Enter manager invite code"}
+                  value={form.inviteCode}
+                  onChange={handleChange}
+                  className="input-field"
+                  disabled={isLoading}
+                />
+                <p className="text-surface-400 text-xs mt-2">
+                  Privileged roles require authorization. Public registrations without a valid code safely default to Developer access.
+                </p>
+              </div>
+            )}
 
             {/* Password and Confirm password in two columns on sm+ */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

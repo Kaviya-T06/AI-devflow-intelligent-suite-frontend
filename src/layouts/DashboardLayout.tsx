@@ -9,6 +9,7 @@ import { usePresence } from "../context/PresenceContext";
 import StatusSelector from "../components/presence/StatusSelector";
 import StatusDot from "../components/presence/StatusDot";
 import type { UserRole } from "../types";
+import { normalizeRole } from "../services/profileService";
 
 export interface NavItem {
   id: string;
@@ -830,10 +831,9 @@ function TopHeader({ onMenuClick, unreadCount }: { onMenuClick: () => void; unre
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const location = useLocation();
-  // Default to ADMIN when profile hasn't loaded yet (pre-DB: fallback profile synthesized in profileService)
-  const role = (profile?.role ?? "ADMIN") as UserRole;
+  const role = (profile?.role ?? (user?.role ? normalizeRole(user.role) : "DEVELOPER")) as UserRole;
 
   const isAIContinuity = location.pathname.includes("ai-continuity");
 

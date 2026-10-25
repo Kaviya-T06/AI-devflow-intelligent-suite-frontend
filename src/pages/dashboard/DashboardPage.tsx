@@ -9,6 +9,7 @@ import { fetchDashboardStats, fetchRecentActivity } from "../../services/adminSe
 import type { UserRole } from "../../types";
 import type { DashboardStats, } from "../../services/adminService";
 import type { ActivityLog } from "../../types";
+import { normalizeRole } from "../../services/profileService";
 
 const ROLE_CONFIG: Record<UserRole, { title: string; subtitle: string; color: string; items: string[] }> = {
   ADMIN: {
@@ -61,7 +62,7 @@ const ENTITY_ICONS: Record<string, string> = { user: "👤", project: "📁", ta
 
 export default function DashboardPage() {
   const { profile, user } = useAuth();
-  const role = (profile?.role ?? "ADMIN") as UserRole;
+  const role = (profile?.role ?? (user?.role ? normalizeRole(user.role) : "DEVELOPER")) as UserRole;
   const roleConfig = ROLE_CONFIG[role] ?? ROLE_CONFIG.DEVELOPER;
   const isAdmin = role === "ADMIN";
   const isManager = role === "MANAGER";
