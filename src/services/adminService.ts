@@ -2,7 +2,7 @@
  * Admin data service — calls the real FastAPI backend.
  * No mock data. All responses come from the Supabase PostgreSQL database.
  */
-import type { Project, Task, ActivityLog, WorkflowRisk, Repository } from "../types";
+import type { Project, Task, ActivityLog, WorkflowRisk, WorkflowRiskMetrics, Repository } from "../types";
 
 const API = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const BASE = `${API}/api/v1`;
@@ -205,23 +205,90 @@ export async function fetchAllRisks(filters?: {
   severity?: string;
   risk_type?: string;
   project_id?: string;
+  owner_id?: string;
+  is_escalated?: boolean;
+  search?: string;
 }): Promise<WorkflowRisk[]> {
   const params = new URLSearchParams();
-  if (filters?.status)     params.set("status",     filters.status);
-  if (filters?.severity)   params.set("severity",   filters.severity);
-  if (filters?.risk_type)  params.set("risk_type",  filters.risk_type);
-  if (filters?.project_id) params.set("project_id", filters.project_id);
+  if (filters?.status)      params.set("status",       filters.status);
+  if (filters?.severity)    params.set("severity",     filters.severity);
+  if (filters?.risk_type)   params.set("risk_type",    filters.risk_type);
+  if (filters?.project_id)  params.set("project_id",   filters.project_id);
+  if (filters?.owner_id)    params.set("owner_id",     filters.owner_id);
+  if (filters?.search)      params.set("search",       filters.search);
+  if (filters?.is_escalated !== undefined) params.set("is_escalated", String(filters.is_escalated));
   const qs = params.toString() ? `?${params.toString()}` : "";
   return apiFetch<WorkflowRisk[]>(`/workflow-risks${qs}`);
 }
 
+export async function fetchRiskMetrics(): Promise<WorkflowRiskMetrics> {
+  return apiFetch<WorkflowRiskMetrics>("/workflow-risks/metrics/summary");
+}
+
+export async function fetchRiskDetail(riskId: string): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}`);
+}
+
 export async function updateRiskStatus(
   id: string,
-  status: WorkflowRisk["status"],
-): Promise<void> {
-  await apiFetch(`/workflow-risks/${id}`, {
+  status: string,
+  resolutionNotes?: string,
+  reason?: string,
+): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, resolution_notes: resolutionNotes, reason }),
+  });
+}
+
+export async function setRiskActionPlan(
+  riskId: string,
+  payload: { action_plan: string; recovery_deadline?: string; action_owner_id?: string },
+): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/action`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function addRiskComment(
+  riskId: string,
+  payload: { content: string; is_blocker?: boolean; evidence_url?: string },
+): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/comments`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function escalateRisk(riskId: string, escalateTo: string, reason: string): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/escalate`, {
+    method: "POST",
+    body: JSON.stringify({ escalate_to: escalateTo, reason }),
+  });
+}
+
+export async function resolveRisk(
+  riskId: string,
+  payload: { resolution_notes: string; verify?: boolean; verification_notes?: string },
+): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/resolve`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function reopenRisk(riskId: string, reason: string): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/reopen`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function assignRiskOwner(riskId: string, ownerId: string): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ owner_id: ownerId }),
   });
 }
 

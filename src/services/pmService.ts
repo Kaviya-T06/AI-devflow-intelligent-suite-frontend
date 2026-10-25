@@ -202,21 +202,112 @@ export async function fetchPMRisks(filters?: {
   severity?: string;
   risk_type?: string;
   project_id?: string;
+  owner_id?: string;
+  is_escalated?: boolean;
+  search?: string;
 }): Promise<WorkflowRisk[]> {
   const params = new URLSearchParams();
-  if (filters?.status)     params.set("status",     filters.status);
-  if (filters?.severity)   params.set("severity",   filters.severity);
-  if (filters?.risk_type)  params.set("risk_type",  filters.risk_type);
-  if (filters?.project_id) params.set("project_id", filters.project_id);
+  if (filters?.status)      params.set("status",       filters.status);
+  if (filters?.severity)    params.set("severity",     filters.severity);
+  if (filters?.risk_type)   params.set("risk_type",    filters.risk_type);
+  if (filters?.project_id)  params.set("project_id",   filters.project_id);
+  if (filters?.owner_id)    params.set("owner_id",     filters.owner_id);
+  if (filters?.search)      params.set("search",       filters.search);
+  if (filters?.is_escalated !== undefined) params.set("is_escalated", String(filters.is_escalated));
   const qs = params.toString() ? `?${params.toString()}` : "";
   return apiFetch<WorkflowRisk[]>(`/workflow-risks${qs}`);
 }
 
-/**
- * Fetch workflow risks relevant to the current developer's tasks.
- */
-export async function fetchMyRisks(): Promise<WorkflowRisk[]> {
-  return apiFetch<WorkflowRisk[]>("/workflow-risks");
+/** Fetch risks for the current developer's assigned tasks. */
+export async function fetchMyRisks(filters?: {
+  status?: string;
+  risk_type?: string;
+}): Promise<WorkflowRisk[]> {
+  const params = new URLSearchParams();
+  if (filters?.status)    params.set("status",    filters.status);
+  if (filters?.risk_type) params.set("risk_type", filters.risk_type);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch<WorkflowRisk[]>(`/workflow-risks${qs}`);
+}
+
+/** Fetch full investigation details for a single risk. */
+export async function fetchRiskDetail(riskId: string): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}`);
+}
+
+/** Fetch aggregated risk metrics summary. */
+export async function fetchRiskMetrics(): Promise<import("../types").WorkflowRiskMetrics> {
+  return apiFetch<import("../types").WorkflowRiskMetrics>("/workflow-risks/metrics/summary");
+}
+
+/** Transition risk lifecycle status. */
+export async function updateRiskStatus(
+  riskId: string,
+  status: string,
+  resolutionNotes?: string,
+  reason?: string,
+): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, resolution_notes: resolutionNotes, reason }),
+  });
+}
+
+/** Set or update a corrective action plan and recovery deadline. */
+export async function setRiskActionPlan(
+  riskId: string,
+  payload: { action_plan: string; recovery_deadline?: string; action_owner_id?: string },
+): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/action`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Add a progress comment, blocker flag, or evidence URL to a risk. */
+export async function addRiskComment(
+  riskId: string,
+  payload: { content: string; is_blocker?: boolean; evidence_url?: string },
+): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/comments`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Escalate a risk to PROJECT_MANAGER or ADMIN. */
+export async function escalateRisk(riskId: string, escalateTo: string, reason: string): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/escalate`, {
+    method: "POST",
+    body: JSON.stringify({ escalate_to: escalateTo, reason }),
+  });
+}
+
+/** Explicitly resolve a risk with notes and optional formal verification. */
+export async function resolveRisk(
+  riskId: string,
+  payload: { resolution_notes: string; verify?: boolean; verification_notes?: string },
+): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/resolve`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Reopen a previously resolved risk. */
+export async function reopenRisk(riskId: string, reason: string): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/reopen`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/** Assign or reassign a risk owner. */
+export async function assignRiskOwner(riskId: string, ownerId: string): Promise<WorkflowRisk> {
+  return apiFetch<WorkflowRisk>(`/workflow-risks/${riskId}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ owner_id: ownerId }),
+  });
 }
 
 export async function fetchProjectHistory(projectId: string): Promise<ActivityLog[]> {

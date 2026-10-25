@@ -10,14 +10,18 @@ import {
 } from "../../services/notificationService";
 import type { Notification, NotificationType } from "../../types";
 
-type FilterTab = "ALL" | "UNREAD" | "TASKS" | "RISKS";
+type FilterTab = "ALL" | "UNREAD" | "READ" | "TASKS" | "RISKS";
+
+const PAGE_SIZE = 25;
 
 export default function NotificationsPage() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -27,9 +31,10 @@ export default function NotificationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchNotifications();
+      const res = await fetchNotifications(undefined, PAGE_SIZE, 0);
       setNotifications(res.items || []);
       setUnreadCount(res.unread_count || 0);
+      setTotalCount(res.total || (res.items || []).length);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load notifications.";
       setError(msg);
@@ -37,6 +42,25 @@ export default function NotificationsPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleLoadMore = async () => {
+    if (loadingMore || notifications.length >= totalCount) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetchNotifications(undefined, PAGE_SIZE, notifications.length);
+      const newItems = res.items || [];
+      setNotifications((prev) => {
+        const existingIds = new Set(prev.map((n) => n.id));
+        const filteredNew = newItems.filter((n) => !existingIds.has(n.id));
+        return [...prev, ...filteredNew];
+      });
+      setTotalCount(res.total);
+    } catch (err: unknown) {
+      console.error("Failed to load more notifications:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     loadNotifications();
@@ -46,9 +70,13 @@ export default function NotificationsPage() {
     if (e) e.stopPropagation();
     setProcessingId(id);
     try {
-      await markAsRead(id);
+      const updated = await markAsRead(id);
       setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+        prev.map((n) =>
+          n.id === id
+            ? { ...n, is_read: true, read_at: updated.read_at || new Date().toISOString() }
+            : n
+        )
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (err: unknown) {
@@ -62,7 +90,10 @@ export default function NotificationsPage() {
     setMarkingAll(true);
     try {
       await markAllAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      const nowIso = new Date().toISOString();
+      setNotifications((prev) =>
+        prev.map((n) => (n.is_read ? n : { ...n, is_read: true, read_at: nowIso }))
+      );
       setUnreadCount(0);
     } catch (err: unknown) {
       console.error("Failed to mark all as read:", err);
@@ -78,6 +109,7 @@ export default function NotificationsPage() {
       await deleteNotification(id);
       const target = notifications.find((n) => n.id === id);
       setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setTotalCount((prev) => Math.max(0, prev - 1));
       if (target && !target.is_read) {
         setUnreadCount((prev) => Math.max(0, prev - 1));
       }
@@ -133,18 +165,27 @@ export default function NotificationsPage() {
     }
   };
 
+  const isTaskType = (type: NotificationType) =>
+    [
+      "TASK_ASSIGNED",
+      "TASK_STATUS_CHANGED",
+      "TASK_REVIEW_REQUESTED",
+      "TASK_COMPLETED",
+      "TASK_OVERDUE",
+      "SMART_ALLOCATION",
+      "GITHUB_EVENT",
+    ].includes(type);
+
+  // Compute counts for tabs
+  const readCount = notifications.filter((n) => n.is_read).length;
+  const currentUnreadCount = notifications.filter((n) => !n.is_read).length;
+  const tasksCount = notifications.filter((n) => isTaskType(n.type)).length;
+  const risksCount = notifications.filter((n) => n.type === "RISK_ALERT").length;
+
   const filteredNotifications = notifications.filter((n) => {
     if (activeTab === "UNREAD") return !n.is_read;
-    if (activeTab === "TASKS")
-      return [
-        "TASK_ASSIGNED",
-        "TASK_STATUS_CHANGED",
-        "TASK_REVIEW_REQUESTED",
-        "TASK_COMPLETED",
-        "TASK_OVERDUE",
-        "SMART_ALLOCATION",
-        "GITHUB_EVENT",
-      ].includes(n.type);
+    if (activeTab === "READ") return n.is_read;
+    if (activeTab === "TASKS") return isTaskType(n.type);
     if (activeTab === "RISKS") return n.type === "RISK_ALERT";
     return true;
   });
@@ -282,7 +323,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs: Clear All, Unread, and Read filters */}
       <div className="flex items-center gap-2 border-b border-surface-700/50 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab("ALL")}
@@ -302,7 +343,17 @@ export default function NotificationsPage() {
               : "text-surface-400 hover:text-surface-200 hover:bg-surface-800"
           }`}
         >
-          Unread ({unreadCount})
+          Unread ({currentUnreadCount})
+        </button>
+        <button
+          onClick={() => setActiveTab("READ")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            activeTab === "READ"
+              ? "bg-primary-500/20 text-primary-300 border border-primary-500/30"
+              : "text-surface-400 hover:text-surface-200 hover:bg-surface-800"
+          }`}
+        >
+          Read ({readCount})
         </button>
         <button
           onClick={() => setActiveTab("TASKS")}
@@ -312,7 +363,7 @@ export default function NotificationsPage() {
               : "text-surface-400 hover:text-surface-200 hover:bg-surface-800"
           }`}
         >
-          Tasks
+          Tasks ({tasksCount})
         </button>
         <button
           onClick={() => setActiveTab("RISKS")}
@@ -322,7 +373,7 @@ export default function NotificationsPage() {
               : "text-surface-400 hover:text-surface-200 hover:bg-surface-800"
           }`}
         >
-          Risks
+          Risks ({risksCount})
         </button>
       </div>
 
@@ -368,6 +419,8 @@ export default function NotificationsPage() {
           <p className="text-surface-500 text-sm mt-2">
             {activeTab === "UNREAD"
               ? "You're all caught up! No unread notifications."
+              : activeTab === "READ"
+              ? "No previously read notifications yet."
               : "We'll notify you when tasks, risks, or assignments require your attention."}
           </p>
         </div>
@@ -382,26 +435,35 @@ export default function NotificationsPage() {
               onClick={() => handleNavigateToTarget(n)}
               className={`glass-card p-4 flex items-start justify-between gap-4 transition-all cursor-pointer ${
                 !n.is_read
-                  ? "bg-surface-800/90 border-l-4 border-l-primary-500 shadow-md"
-                  : "opacity-80 hover:opacity-100"
+                  ? "bg-surface-800/95 border-l-4 border-l-primary-500 shadow-md border-surface-700/60"
+                  : "bg-surface-800/40 border border-surface-700/40 opacity-85 hover:opacity-100"
               }`}
             >
               <div className="flex items-start gap-4 min-w-0 flex-1">
                 {getIcon(n.type)}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-semibold text-surface-100 truncate">
+                    <h4 className={`text-sm truncate ${!n.is_read ? "font-semibold text-surface-100" : "font-medium text-surface-300"}`}>
                       {n.title}
                     </h4>
-                    {!n.is_read && (
+                    {!n.is_read ? (
                       <span className="w-2 h-2 rounded-full bg-primary-400 shrink-0" title="Unread" />
+                    ) : (
+                      <span className="text-[10px] uppercase font-semibold text-surface-500 bg-surface-700/50 px-1.5 py-0.5 rounded shrink-0">
+                        Read
+                      </span>
                     )}
                   </div>
-                  <p className="text-surface-300 text-xs mt-1 leading-relaxed">
+                  <p className={`text-xs mt-1 leading-relaxed ${!n.is_read ? "text-surface-300" : "text-surface-400"}`}>
                     {n.message}
                   </p>
-                  <div className="flex items-center gap-3 text-xs text-surface-500 mt-2">
+                  <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-surface-500 mt-2">
                     <span>{formatDate(n.created_at)}</span>
+                    {n.read_at && (
+                      <span className="text-surface-500">
+                        · Read {formatDate(n.read_at)}
+                      </span>
+                    )}
                     {(n.type === "GITHUB_EVENT" || n.title.toLowerCase().includes("github") || n.title.toLowerCase().includes("branch")) && n.project_id ? (
                       <span className="text-purple-400 hover:text-purple-300 font-medium">
                         View GitHub Branch →
@@ -436,7 +498,7 @@ export default function NotificationsPage() {
                 <button
                   onClick={(e) => handleDelete(n.id, e)}
                   disabled={processingId === n.id}
-                  title="Dismiss notification"
+                  title="Delete notification"
                   className="p-1.5 rounded-lg text-surface-400 hover:text-red-400 hover:bg-surface-700/50 transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -446,6 +508,28 @@ export default function NotificationsPage() {
               </div>
             </div>
           ))}
+
+          {/* Pagination / Load More button */}
+          {notifications.length < totalCount && (
+            <div className="pt-4 text-center">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="btn-secondary text-xs px-4 py-2 inline-flex items-center gap-2"
+              >
+                {loadingMore ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-surface-400 border-t-primary-400 rounded-full animate-spin" />
+                    Loading older notifications...
+                  </>
+                ) : (
+                  <>
+                    Load older notifications ({notifications.length} of {totalCount})
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

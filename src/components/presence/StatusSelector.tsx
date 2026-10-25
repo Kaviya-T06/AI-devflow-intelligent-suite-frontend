@@ -121,22 +121,24 @@ export default function StatusSelector({
       <button
         id="status-selector-btn"
         onClick={() => { setOpen((p) => !p); setCustomizing(false); }}
-        className="flex items-center gap-1.5 rounded-full px-2 py-1 text-xs text-surface-300 hover:text-surface-100 hover:bg-surface-700/60 transition-colors border border-transparent hover:border-surface-600/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+        className="w-full flex items-center justify-between gap-1.5 rounded-lg px-2.5 py-1 text-xs text-surface-300 hover:text-surface-100 bg-surface-800/60 hover:bg-surface-700/60 transition-colors border border-surface-700/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-400"
         aria-label="Change your status"
         title={loading ? "Loading…" : isReconnecting ? "Reconnecting…" : `Status: ${config.label}`}
         disabled={saving}
       >
-        {isReconnecting ? (
-          <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse shrink-0" />
-        ) : (
-          <StatusDot status={effectiveStatus} size="xs" showTitle={false} />
-        )}
-        <span className="hidden sm:inline max-w-[100px] truncate">
-          {isReconnecting
-            ? "Reconnecting…"
-            : loading
-            ? "Loading…"
-            : config.label}
+        <span className="flex items-center gap-1.5 min-w-0">
+          {isReconnecting ? (
+            <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse shrink-0" />
+          ) : (
+            <StatusDot status={effectiveStatus} size="xs" showTitle={false} />
+          )}
+          <span className="truncate max-w-[130px]">
+            {isReconnecting
+              ? "Reconnecting…"
+              : loading
+              ? "Loading…"
+              : config.label}
+          </span>
         </span>
         <ChevronDownIcon />
       </button>

@@ -34,8 +34,20 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
-export async function fetchNotifications(token?: string, limit = 50, offset = 0): Promise<NotificationListResponse> {
-  return request<NotificationListResponse>(`/api/v1/notifications?limit=${limit}&offset=${offset}`, {}, token);
+export async function fetchNotifications(
+  token?: string,
+  limit = 50,
+  offset = 0,
+  status?: string
+): Promise<NotificationListResponse> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (status && status !== "ALL") {
+    params.set("status", status.toLowerCase());
+  }
+  return request<NotificationListResponse>(`/api/v1/notifications?${params.toString()}`, {}, token);
 }
 
 export async function fetchUnreadCount(token?: string): Promise<number> {
