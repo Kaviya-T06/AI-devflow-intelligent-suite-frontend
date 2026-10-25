@@ -959,6 +959,15 @@ export default function AIContinuityPage() {
                 </span>
               </>
             )}
+            {github?.repository && (
+              <>
+                <span className="text-surface-600 hidden lg:inline">|</span>
+                <span className="text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/25 font-mono text-[11px] hidden lg:inline-flex items-center gap-1" title="Connected GitHub Repository">
+                  <GitBranch className="w-3 h-3 text-cyan-400" />
+                  <span>{github.repository}</span>
+                </span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
