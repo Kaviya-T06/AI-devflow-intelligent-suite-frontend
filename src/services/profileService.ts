@@ -60,7 +60,7 @@ export async function fetchProfile(_userId?: string): Promise<Profile | null> {
     });
 
     if (!res.ok) {
-      if (res.status === 401) {
+      if (res.status === 401 || res.status === 403) {
         localStorage.removeItem("access_token");
         localStorage.removeItem("auth_user");
         return null;

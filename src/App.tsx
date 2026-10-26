@@ -204,8 +204,8 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Default routes: unauthenticated users redirect to /login; authenticated users go to /dashboard */}
-          <Route path="/" element={<RootRoute />} />
+          {/* Default routes: root URL displays the Login page by default */}
+          <Route path="/" element={<LoginPage />} />
           <Route path="*" element={<RootRoute />} />
         </Routes>
           </ErrorBoundary>

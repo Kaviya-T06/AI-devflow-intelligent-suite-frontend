@@ -171,9 +171,10 @@ export async function logoutUser(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export function isTokenExpired(token: string): boolean {
+  if (!token || typeof token !== "string") return true;
   try {
     const parts = token.split(".");
-    if (parts.length !== 3) return false;
+    if (parts.length !== 3) return true;
     const base64Url = parts[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
     const jsonPayload = decodeURIComponent(
@@ -183,19 +184,21 @@ export function isTokenExpired(token: string): boolean {
         .join("")
     );
     const payload = JSON.parse(jsonPayload);
-    if (payload.exp && typeof payload.exp === "number") {
-      return Date.now() >= payload.exp * 1000;
-    }
-    return false;
+    if (!payload || typeof payload !== "object") return true;
+    if (typeof payload.exp !== "number") return true;
+    return Date.now() >= payload.exp * 1000;
   } catch {
-    return false;
+    return true;
   }
 }
 
 export function getCurrentSession(): { token: string; user: AuthUser } | null {
   const token = getStoredToken();
   const user = getStoredUser();
-  if (!token || !user) return null;
+  if (!token || !user || !user.id || !user.role) {
+    clearToken();
+    return null;
+  }
   if (isTokenExpired(token)) {
     clearToken();
     return null;

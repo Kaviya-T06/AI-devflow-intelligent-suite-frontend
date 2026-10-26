@@ -258,6 +258,12 @@ function countWorkingDays(startDateStr: string | null | undefined, endDateStr: s
   return count;
 }
 
+function formatHours(val: number | null | undefined): string {
+  if (val === null || val === undefined) return "—";
+  const rounded = Math.round(val * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}` : `${rounded.toFixed(1)}`;
+}
+
 function computeCapacity(workingDays: number, developers: { capacity_hours_per_week?: number | null }[]): number {
   if (workingDays <= 0) return 0;
   const weeks = workingDays / 5.0;
@@ -291,11 +297,12 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
     ? deadlineResult.baseline.remaining_estimated_effort_hours
     : (simulatorData ? simulatorData.total_estimated_effort_hours : null);
 
+  // Rule 2: Capacity Gap = Available Capacity − Estimated Effort Required
   const currentCapacityGap = tasksMissingEstimates > 0
     ? null
     : (currentAvailableCapacity !== null && currentEffort !== null
         ? Math.round((currentAvailableCapacity - currentEffort) * 10) / 10
-        : null);
+        : (deadlineResult?.baseline.capacity_gap_hours ?? null));
 
   // HYPOTHETICAL SCENARIO METRICS
   const hypotheticalDeadline = deadlineResult?.scenario.proposed_deadline ?? (proposedDate || null);
@@ -313,23 +320,29 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
     ? deadlineResult.scenario.remaining_estimated_effort_hours
     : currentEffort;
 
+  // Rule 2: Capacity Gap = Available Capacity − Estimated Effort Required
   const hypotheticalCapacityGap = tasksMissingEstimates > 0
     ? null
-    : (deadlineResult?.scenario.capacity_gap_hours !== undefined && deadlineResult.scenario.capacity_gap_hours !== null
-        ? deadlineResult.scenario.capacity_gap_hours
-        : (hypotheticalCapacity !== null && hypotheticalEffort !== null
-            ? Math.round((hypotheticalCapacity - hypotheticalEffort) * 10) / 10
-            : null));
+    : (hypotheticalCapacity !== null && hypotheticalEffort !== null
+        ? Math.round((hypotheticalCapacity - hypotheticalEffort) * 10) / 10
+        : (deadlineResult?.scenario.capacity_gap_hours !== undefined ? deadlineResult.scenario.capacity_gap_hours : null));
 
   // IMPACT DIFFERENCES
-  const daysDiff = hypotheticalDeadline && currentDeadline
+  // Rule 8: Verify calendar-day differences independently from working-day differences
+  const calendarDaysDiff = hypotheticalDeadline && currentDeadline
+    ? Math.round((new Date(hypotheticalDeadline + "T00:00:00").getTime() - new Date(currentDeadline + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  const workingDaysDiff = hypotheticalDeadline && currentDeadline
     ? hypotheticalWorkingDays - currentWorkingDays
     : null;
 
+  // Rule 4: Available Capacity Difference = Hypothetical Available Capacity − Current Available Capacity
   const capacityDiff = hypotheticalCapacity !== null && currentAvailableCapacity !== null
     ? Math.round((hypotheticalCapacity - currentAvailableCapacity) * 10) / 10
     : null;
 
+  // Rule 3: Capacity Gap Difference = Hypothetical Capacity Gap − Current Capacity Gap
   const gapDiff = tasksMissingEstimates > 0
     ? null
     : (hypotheticalCapacityGap !== null && currentCapacityGap !== null
@@ -379,7 +392,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
     const shortfall = Math.abs(hypotheticalCapacityGap);
     feasibilityBadge = {
       label: "Capacity Shortfall",
-      subtext: `Workload exceeds capacity by ${shortfall} hrs`,
+      subtext: `Workload exceeds capacity by ${formatHours(shortfall)} hrs`,
       colorClass: "text-danger-400",
       bgClass: "bg-danger-500/10",
       borderClass: "border-danger-500/30",
@@ -387,7 +400,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
   } else if (hypotheticalCapacityGap !== null && hypotheticalCapacityGap >= 0) {
     feasibilityBadge = {
       label: "Feasible",
-      subtext: `Sufficient capacity (+${hypotheticalCapacityGap} hrs buffer)`,
+      subtext: `Sufficient capacity (+${formatHours(hypotheticalCapacityGap)} hrs buffer)`,
       colorClass: "text-success-400",
       bgClass: "bg-success-500/10",
       borderClass: "border-success-500/30",
@@ -768,7 +781,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
               <div>
                 <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Available Capacity</span>
                 <span className="text-lg font-bold text-surface-100 mt-0.5 block">
-                  {currentAvailableCapacity !== null ? `${currentAvailableCapacity} hrs` : "—"}
+                  {currentAvailableCapacity !== null ? `${formatHours(currentAvailableCapacity)} hrs` : "—"}
                 </span>
               </div>
               <span className="text-xs text-surface-400 text-right">
@@ -782,7 +795,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
                 <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Estimated Effort Required</span>
                 <div className="flex flex-wrap items-center gap-2 mt-0.5">
                   <span className="text-lg font-bold text-surface-100">
-                    {currentEffort !== null ? `${currentEffort} hrs` : "—"}
+                    {currentEffort !== null ? `${formatHours(currentEffort)} hrs` : "—"}
                   </span>
                   {tasksMissingEstimates > 0 && (
                     <span className="text-[11px] text-warning-400 font-medium bg-warning-500/10 px-2 py-0.5 rounded border border-warning-500/20">
@@ -807,7 +820,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
                     </span>
                   ) : currentCapacityGap !== null ? (
                     <span className={`text-lg font-bold ${currentCapacityGap >= 0 ? "text-success-400" : "text-danger-400"}`}>
-                      {currentCapacityGap > 0 ? `+${currentCapacityGap} hrs` : `${currentCapacityGap} hrs`}
+                      {currentCapacityGap > 0 ? `+${formatHours(currentCapacityGap)} hrs` : `${formatHours(currentCapacityGap)} hrs`}
                     </span>
                   ) : (
                     <span className="text-lg font-bold text-surface-400">—</span>
@@ -818,7 +831,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
                 {tasksMissingEstimates > 0
                   ? "Add estimates to calculate"
                   : currentCapacityGap !== null
-                    ? (currentCapacityGap > 0 ? "Capacity surplus" : (currentCapacityGap === 0 ? "Exact match" : `Shortfall of ${Math.abs(currentCapacityGap)}h`))
+                    ? (currentCapacityGap > 0 ? "Capacity surplus" : (currentCapacityGap === 0 ? "Exact match" : `Shortfall of ${formatHours(Math.abs(currentCapacityGap))}h`))
                     : "—"}
               </span>
             </div>
@@ -867,7 +880,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
               <div>
                 <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Available Capacity</span>
                 <span className="text-lg font-bold text-surface-100 mt-0.5 block">
-                  {hypotheticalCapacity !== null ? `${hypotheticalCapacity} hrs` : "—"}
+                  {hypotheticalCapacity !== null ? `${formatHours(hypotheticalCapacity)} hrs` : "—"}
                 </span>
               </div>
               <span className="text-xs text-surface-400 text-right">
@@ -881,7 +894,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
                 <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider block">Estimated Effort Required</span>
                 <div className="flex flex-wrap items-center gap-2 mt-0.5">
                   <span className="text-lg font-bold text-surface-100">
-                    {hypotheticalEffort !== null ? `${hypotheticalEffort} hrs` : "—"}
+                    {hypotheticalEffort !== null ? `${formatHours(hypotheticalEffort)} hrs` : "—"}
                   </span>
                   {tasksMissingEstimates > 0 && (
                     <span className="text-[11px] text-warning-400 font-medium bg-warning-500/10 px-2 py-0.5 rounded border border-warning-500/20">
@@ -906,7 +919,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
                     </span>
                   ) : hypotheticalCapacityGap !== null ? (
                     <span className={`text-lg font-bold ${hypotheticalCapacityGap >= 0 ? "text-success-400" : "text-danger-400"}`}>
-                      {hypotheticalCapacityGap > 0 ? `+${hypotheticalCapacityGap} hrs` : `${hypotheticalCapacityGap} hrs`}
+                      {hypotheticalCapacityGap > 0 ? `+${formatHours(hypotheticalCapacityGap)} hrs` : `${formatHours(hypotheticalCapacityGap)} hrs`}
                     </span>
                   ) : (
                     <span className="text-lg font-bold text-surface-400">—</span>
@@ -917,7 +930,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
                 {tasksMissingEstimates > 0
                   ? "Add estimates to calculate"
                   : hypotheticalCapacityGap !== null
-                    ? (hypotheticalCapacityGap > 0 ? "Capacity surplus" : (hypotheticalCapacityGap === 0 ? "Exact match" : `Shortfall of ${Math.abs(hypotheticalCapacityGap)}h`))
+                    ? (hypotheticalCapacityGap > 0 ? "Capacity surplus" : (hypotheticalCapacityGap === 0 ? "Exact match" : `Shortfall of ${formatHours(Math.abs(hypotheticalCapacityGap))}h`))
                     : "Run simulation to calculate"}
               </span>
             </div>
@@ -942,17 +955,17 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
           <div className="p-4 rounded-xl bg-surface-800/40 border border-surface-700/50 flex flex-col justify-between min-h-[105px]">
             <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider">Deadline Difference</span>
             <div className="mt-1">
-              {daysDiff === null ? (
+              {calendarDaysDiff === null ? (
                 <span className="text-lg font-bold text-surface-400">—</span>
-              ) : daysDiff < 0 ? (
+              ) : calendarDaysDiff < 0 ? (
                 <div className="flex items-baseline gap-1.5 flex-wrap">
-                  <span className="text-lg font-bold text-warning-400">Earlier by {Math.abs(daysDiff)} days</span>
-                  <span className="text-xs text-warning-400/80 font-medium">({Math.abs(daysDiff)} working days)</span>
+                  <span className="text-lg font-bold text-warning-400">Earlier by {Math.abs(calendarDaysDiff)} days</span>
+                  <span className="text-xs text-warning-400/80 font-medium">({Math.abs(workingDaysDiff ?? 0)} working days)</span>
                 </div>
-              ) : daysDiff > 0 ? (
+              ) : calendarDaysDiff > 0 ? (
                 <div className="flex items-baseline gap-1.5 flex-wrap">
-                  <span className="text-lg font-bold text-primary-300">Later by {daysDiff} days</span>
-                  <span className="text-xs text-primary-300/80 font-medium">(+{daysDiff} working days)</span>
+                  <span className="text-lg font-bold text-primary-300">Later by {calendarDaysDiff} days</span>
+                  <span className="text-xs text-primary-300/80 font-medium">(+{workingDaysDiff ?? 0} working days)</span>
                 </div>
               ) : (
                 <span className="text-lg font-bold text-surface-200">0 days (Same date)</span>
@@ -971,18 +984,18 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
                 <span className="text-lg font-bold text-surface-400">—</span>
               ) : capacityDiff < 0 ? (
                 <span className="text-lg font-bold text-danger-400">
-                  {capacityDiff} hrs <span className="text-xs font-normal">↓ reduction</span>
+                  {formatHours(capacityDiff)} hrs <span className="text-xs font-normal">↓ reduction</span>
                 </span>
               ) : capacityDiff > 0 ? (
                 <span className="text-lg font-bold text-success-400">
-                  +{capacityDiff} hrs <span className="text-xs font-normal">↑ capacity</span>
+                  +{formatHours(capacityDiff)} hrs <span className="text-xs font-normal">↑ capacity</span>
                 </span>
               ) : (
                 <span className="text-lg font-bold text-surface-200">0 hrs (No change)</span>
               )}
             </div>
             <span className="text-[11px] text-surface-400 mt-1">
-              {currentAvailableCapacity !== null ? `${currentAvailableCapacity}h` : "—"} → {hypotheticalCapacity !== null ? `${hypotheticalCapacity}h` : "—"}
+              {currentAvailableCapacity !== null ? `${formatHours(currentAvailableCapacity)}h` : "—"} → {hypotheticalCapacity !== null ? `${formatHours(hypotheticalCapacity)}h` : "—"}
             </span>
           </div>
 
@@ -996,11 +1009,11 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
                 <span className="text-lg font-bold text-surface-400">—</span>
               ) : gapDiff < 0 ? (
                 <span className="text-lg font-bold text-danger-400">
-                  {gapDiff} hrs <span className="text-xs font-normal">↓ tighter buffer</span>
+                  {formatHours(gapDiff)} hrs <span className="text-xs font-normal">↓ tighter buffer</span>
                 </span>
               ) : gapDiff > 0 ? (
                 <span className="text-lg font-bold text-success-400">
-                  +{gapDiff} hrs <span className="text-xs font-normal">↑ larger buffer</span>
+                  +{formatHours(gapDiff)} hrs <span className="text-xs font-normal">↑ larger buffer</span>
                 </span>
               ) : (
                 <span className="text-lg font-bold text-surface-200">0 hrs (Neutral)</span>
@@ -1009,7 +1022,7 @@ function computeCapacity(workingDays: number, developers: { capacity_hours_per_w
             <span className="text-[11px] text-surface-400 mt-1">
               {tasksMissingEstimates > 0
                 ? "Requires all task estimates"
-                : `${currentCapacityGap !== null ? (currentCapacityGap > 0 ? `+${currentCapacityGap}h` : `${currentCapacityGap}h`) : "—"} → ${hypotheticalCapacityGap !== null ? (hypotheticalCapacityGap > 0 ? `+${hypotheticalCapacityGap}h` : `${hypotheticalCapacityGap}h`) : "—"}`}
+                : `${currentCapacityGap !== null ? (currentCapacityGap > 0 ? `+${formatHours(currentCapacityGap)}h` : `${formatHours(currentCapacityGap)}h`) : "—"} → ${hypotheticalCapacityGap !== null ? (hypotheticalCapacityGap > 0 ? `+${formatHours(hypotheticalCapacityGap)}h` : `${formatHours(hypotheticalCapacityGap)}h`) : "—"}`}
             </span>
           </div>
 

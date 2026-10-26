@@ -32,6 +32,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { fetchAllProjects } from "../../services/adminService";
+import type { Project } from "../../types";
+import { getCachedProjects } from "../../services/projectsCache";
 import {
   generateContinuitySummary,
   askContinuityQuestion,
@@ -312,9 +314,16 @@ export default function AIContinuityPage() {
   const location = useLocation();
   const initialProjectId = searchParams.get("project") || "";
 
-  const [projects, setProjects] = useState<{ id: string; name: string; status: string }[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId);
-  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [projects, setProjects] = useState<Project[]>(() => getCachedProjects() || []);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(() => {
+    if (initialProjectId) return initialProjectId;
+    const cached = getCachedProjects();
+    return cached && cached.length > 0 ? cached[0].id : "";
+  });
+  const [loadingProjects, setLoadingProjects] = useState<boolean>(() => !Boolean(getCachedProjects()?.length));
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [loadingBriefing, setLoadingBriefing] = useState<boolean>(false);
+  const briefingCacheRef = useRef<Record<string, ContinuitySummary>>({});
 
   // Active View Mode: Chat Workspace vs. Handover Intelligence Dossier
   const [activeTab, setActiveTab] = useState<"chat" | "dossier">("chat");
@@ -377,25 +386,30 @@ export default function AIContinuityPage() {
 
   // Load all projects on mount
   useEffect(() => {
+    let isMounted = true;
     async function loadProjects() {
       try {
+        setProjectsError(null);
         const data = await fetchAllProjects();
-        const fetchedProjects = data.map((p) => ({
-          id: p.id,
-          name: p.name,
-          status: p.status,
-        }));
-        setProjects(fetchedProjects);
-        if (!selectedProjectId && fetchedProjects.length > 0) {
-          setSelectedProjectId(fetchedProjects[0].id);
+        if (!isMounted) return;
+        setProjects(data);
+        if (!selectedProjectId && data.length > 0) {
+          setSelectedProjectId(data[0].id);
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (!isMounted) return;
         console.error("Failed to load projects", err);
+        setProjectsError(err.message || "Failed to load projects");
       } finally {
-        setLoadingProjects(false);
+        if (isMounted) {
+          setLoadingProjects(false);
+        }
       }
     }
     loadProjects();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Update query params when project changes
@@ -424,20 +438,34 @@ export default function AIContinuityPage() {
   useEffect(() => {
     if (selectedProjectId) {
       checkStatus(selectedProjectId);
-      setSummary(null);
       setSummaryError(null);
-      setSummarySource(null);
       setLastFailedQuestion(null);
 
-      // Fetch verified database briefing as fast instant preview
+      // Check if we already have a cached briefing for this project
+      const cached = briefingCacheRef.current[selectedProjectId];
+      if (cached) {
+        setSummary(cached);
+        setSummarySource("briefing");
+        setLoadingBriefing(false);
+      } else {
+        setSummary(null);
+        setSummarySource(null);
+        setLoadingBriefing(true);
+      }
+
+      // Fetch verified database briefing as fast preview
       const token = localStorage.getItem("access_token") || "";
       getContinuityDataBriefing(selectedProjectId, token)
         .then((briefing) => {
-          setSummary((prev) => (prev ? prev : briefing));
-          setSummarySource((prev) => (prev ? prev : "briefing"));
+          briefingCacheRef.current[selectedProjectId] = briefing;
+          setSummary(briefing);
+          setSummarySource("briefing");
         })
         .catch((err) => {
           console.warn("Could not load initial data briefing", err);
+        })
+        .finally(() => {
+          setLoadingBriefing(false);
         });
     } else {
       checkStatus("general");
@@ -722,11 +750,13 @@ export default function AIContinuityPage() {
   const currentProject = projects.find((p) => p.id === selectedProjectId);
 
   const pmName = useMemo(() => {
+    if (currentProject?.project_manager?.full_name) return currentProject.project_manager.full_name;
+    if (currentProject?.project_manager?.name) return currentProject.project_manager.name;
     if (!ctx?.project) return "Unknown";
     const u = ctx.project.users;
     if (Array.isArray(u)) return u[0]?.name || "Unknown";
     return u?.name || "Unknown";
-  }, [ctx]);
+  }, [ctx, currentProject]);
 
   const getDevName = (task: any) => {
     const u = task?.users;
@@ -907,9 +937,15 @@ export default function AIContinuityPage() {
               className="bg-transparent text-surface-100 text-xs font-medium focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[180px] md:max-w-[220px] truncate py-0.5"
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
-              disabled={loadingProjects}
+              disabled={loadingProjects && projects.length === 0}
             >
-              {projects.length === 0 && <option value="">No projects available</option>}
+              {loadingProjects && projects.length === 0 ? (
+                <option value="">Loading projects…</option>
+              ) : projectsError && projects.length === 0 ? (
+                <option value="">Error loading projects</option>
+              ) : projects.length === 0 ? (
+                <option value="">No projects available</option>
+              ) : null}
               {projects.map((p) => (
                 <option key={p.id} value={p.id} className="bg-surface-900 text-surface-100">
                   {p.name}{p.status ? ` (${p.status})` : ""}
@@ -941,15 +977,28 @@ export default function AIContinuityPage() {
           <span className="font-bold text-white flex items-center gap-1.5 shrink-0">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="truncate max-w-[160px] sm:max-w-[220px]">
-              {ctx?.project?.name || currentProject?.name || "Project"}
+              {currentProject?.name || ctx?.project?.name || "Project"}
             </span>
           </span>
 
           <span className="text-surface-700 shrink-0">|</span>
 
           <span className="px-1.5 py-0.5 rounded bg-surface-800 text-surface-200 font-semibold border border-surface-700/80 text-[11px] shrink-0">
-            {ctx?.project?.progress !== undefined ? `${ctx.project.progress}% Complete` : "0% Complete"}
+            {currentProject?.progress !== undefined
+              ? `${currentProject.progress}% Complete`
+              : ctx?.project?.progress !== undefined
+              ? `${ctx.project.progress}% Complete`
+              : "0% Complete"}
           </span>
+
+          {currentProject?.status && (
+            <>
+              <span className="text-surface-700 shrink-0">|</span>
+              <span className="px-1.5 py-0.5 rounded bg-surface-800/80 text-surface-300 font-medium border border-surface-700/60 text-[11px] shrink-0">
+                {currentProject.status.replace("_", " ")}
+              </span>
+            </>
+          )}
 
           <span className="text-surface-700 hidden sm:inline shrink-0">|</span>
 
@@ -1648,28 +1697,6 @@ export default function AIContinuityPage() {
                     )}
                   </div>
                 ))}
-
-                {/* Post-Interaction: 4 Handover Boxes Quick Access Strip (hidden while AI is generating) */}
-                {!asking && (
-                  <div className="pt-2 pb-1 border-t border-surface-800/60 flex items-center justify-between gap-3 text-xs text-surface-400 animate-fade-in">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-3.5 h-3.5 text-primary-400 shrink-0" />
-                      <span className="font-medium text-surface-300">Project Handover Intelligence:</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] bg-surface-800 text-primary-300 border border-surface-700 font-mono">
-                        4 Handover Boxes
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowContextDrawer((prev) => !prev)}
-                      className="px-2.5 py-1 rounded-md text-xs font-semibold bg-surface-800 hover:bg-surface-700 text-primary-300 border border-surface-700 flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
-                    >
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>{showContextDrawer ? "Hide Handover Boxes" : "View 4 Handover Boxes"}</span>
-                      {showContextDrawer ? <ChevronUp className="w-3.5 h-3.5 ml-0.5" /> : <ChevronDown className="w-3.5 h-3.5 ml-0.5" />}
-                    </button>
-                  </div>
-                )}
 
                 <div ref={messagesEndRef} />
               </div>

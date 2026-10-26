@@ -1,10 +1,11 @@
 /**
  * Login page — allows existing users to sign in.
  */
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { loginUser } from "../../services/authService";
 import { useAuth } from "../../context/AuthContext";
+import { normalizeRole } from "../../services/profileService";
 
 type UserRole = "ADMIN" | "DEVELOPER" | "MANAGER";
 
@@ -30,7 +31,7 @@ const EyeIcon = ({ open }: { open: boolean }) =>
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, isLoading: isAuthLoading, refreshAuth } = useAuth();
+  const { refreshAuth } = useAuth();
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/dashboard";
 
   const [form, setForm] = useState({ email: "", password: "" });
@@ -38,13 +39,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // If already authenticated, redirect to dashboard
-  useEffect(() => {
-    if (isAuthenticated && !isAuthLoading) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [isAuthenticated, isAuthLoading, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -68,9 +62,19 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      await loginUser({ email: form.email.trim(), password: form.password });
+      const data = await loginUser({ email: form.email.trim(), password: form.password });
       refreshAuth();
-      const target = from && from !== "/login" && from !== "/" ? from : "/dashboard";
+
+      // Ensure redirect to the correct dashboard based on actual authenticated role
+      const userRole = normalizeRole(data?.user?.role);
+      let target = "/dashboard";
+      if (from && from !== "/login" && from !== "/") {
+        target = from;
+      } else if (userRole === "ADMIN" || userRole === "MANAGER" || userRole === "DEVELOPER") {
+        target = "/dashboard";
+      } else {
+        target = "/dashboard";
+      }
       navigate(target, { replace: true });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Login failed";

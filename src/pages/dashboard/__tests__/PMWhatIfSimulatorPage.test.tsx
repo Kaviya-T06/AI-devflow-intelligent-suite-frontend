@@ -322,4 +322,77 @@ describe("PMWhatIfSimulatorPage - Redesigned Current vs. Hypothetical Comparison
       expect(updateDeveloperCapacity).toHaveBeenCalledWith("p1", "dev-10", 35);
     });
   });
+
+  it("regression test: reconciles 154h current capacity, 17h hypothetical capacity, and 19h estimated effort", async () => {
+    (fetchSimulatorData as any).mockResolvedValue({
+      project_id: "p1",
+      current_deadline: "2026-11-20",
+      total_remaining_tasks: 2,
+      tasks_with_estimates: 2,
+      tasks_missing_estimates: 0,
+      total_estimated_effort_hours: 19,
+      sufficient_data_for_simulation: true,
+      tasks: [],
+      developers: [{ developer_id: "dev1", name: "Alice Dev", capacity_hours_per_week: 40 }],
+    });
+
+    (simulateDeadlineChange as any).mockResolvedValue({
+      scenario_type: "deadline_change",
+      baseline: {
+        project_id: "p1",
+        current_deadline: "2026-11-20",
+        remaining_tasks: 2,
+        available_capacity_hours: 154,
+        remaining_estimated_effort_hours: 19,
+        capacity_gap_hours: 135,
+        tasks_with_estimates: 2,
+        tasks_missing_estimates: 0,
+      },
+      scenario: {
+        proposed_deadline: "2026-10-30",
+        working_days: 4,
+        available_capacity_hours: 17,
+        remaining_tasks: 2,
+        remaining_estimated_effort_hours: 19,
+        capacity_gap_hours: -2,
+        capacity_gap_status: "calculated",
+        tasks_missing_estimates: 0,
+        schedule_concerns: [],
+      },
+      assumptions_and_limitations: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <PMWhatIfSimulatorPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Alpha Project")).toBeInTheDocument();
+    const projectSelect = screen.getByRole("combobox");
+    fireEvent.change(projectSelect, { target: { value: "p1" } });
+
+    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: "2026-10-30" } });
+
+    const runBtn = screen.getByRole("button", { name: /Run Simulation/i });
+    fireEvent.click(runBtn);
+
+    // Baseline: Available Capacity: 154 hrs, Effort: 19 hrs -> Gap: +135 hrs
+    expect(await screen.findByText("154 hrs")).toBeInTheDocument();
+    expect(screen.getByText("+135 hrs")).toBeInTheDocument();
+
+    // Hypothetical: Available Capacity: 17 hrs, Effort: 19 hrs -> Gap: -2 hrs
+    expect(screen.getByText("17 hrs")).toBeInTheDocument();
+    expect(screen.getByText("-2 hrs")).toBeInTheDocument();
+
+    // Available Capacity Difference = 17 - 154 = -137 hrs
+    // Capacity Gap Difference = -2 - (+135) = -137 hrs
+    const diff137Elements = screen.getAllByText(/-137 hrs/i);
+    expect(diff137Elements.length).toBe(2);
+
+    // Feasibility status badge: Capacity Shortfall & Workload exceeds capacity by 2 hrs
+    expect(screen.getByText("Capacity Shortfall")).toBeInTheDocument();
+    expect(screen.getByText(/Workload exceeds capacity by 2 hrs/i)).toBeInTheDocument();
+  });
 });

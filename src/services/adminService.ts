@@ -140,17 +140,20 @@ export async function deleteUser(userId: string): Promise<void> {
   await apiFetch(`/users/${userId}`, { method: "DELETE" });
 }
 
+import { fetchProjectsWithCache, invalidateProjectsCache } from "./projectsCache";
+
 // ---------------------------------------------------------------------------
 // Projects
 // ---------------------------------------------------------------------------
 
-export async function fetchAllProjects(): Promise<Project[]> {
-  return apiFetch<Project[]>("/projects");
+export async function fetchAllProjects(forceRefresh = false): Promise<Project[]> {
+  return fetchProjectsWithCache(() => apiFetch<Project[]>("/projects"), forceRefresh);
 }
 
 export async function createProject(
   data: Omit<Project, "id" | "created_at" | "updated_at">,
 ): Promise<Project> {
+  invalidateProjectsCache();
   return apiFetch<Project>("/projects", {
     method: "POST",
     body: JSON.stringify(data),
@@ -158,6 +161,7 @@ export async function createProject(
 }
 
 export async function updateProject(id: string, data: Partial<Project>): Promise<void> {
+  invalidateProjectsCache();
   await apiFetch(`/projects/${id}`, {
     method: "PATCH",
     body: JSON.stringify(data),
@@ -165,6 +169,7 @@ export async function updateProject(id: string, data: Partial<Project>): Promise
 }
 
 export async function deleteProject(id: string): Promise<void> {
+  invalidateProjectsCache();
   await apiFetch(`/projects/${id}`, { method: "DELETE" });
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { fetchManagedProjects } from "../../services/pmService";
 import { fetchAllProjects } from "../../services/adminService";
+import { getCachedProjects } from "../../services/projectsCache";
 import { useAuth } from "../../context/AuthContext";
 import type { Project } from "../../types";
 import {
@@ -30,8 +31,15 @@ import Modal from "../../components/ui/Modal";
 type Tab = "overview" | "commits" | "pulls" | "issues" | "branches";
 
 export default function PMGitHubIntegrationPage({ projectId }: { projectId?: string } = {}) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId || "");
+  const [projects, setProjects] = useState<Project[]>(() => getCachedProjects() || []);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(() => {
+    if (projectId) return projectId;
+    const cached = getCachedProjects();
+    return cached && cached.length > 0 ? cached[0].id : "";
+  });
+  const [loadingProjects, setLoadingProjects] = useState<boolean>(() => !Boolean(getCachedProjects()?.length));
+  const [projectError, setProjectError] = useState<string | null>(null);
+  const repoCacheRef = useRef<Record<string, GitHubRepository | null>>({});
 
   const [repo, setRepo] = useState<GitHubRepository | null>(null);
   const [loading, setLoading] = useState(false);
@@ -85,20 +93,36 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
   useEffect(() => {
     if (projectId) {
       setSelectedProjectId(projectId);
-      return;
     }
+    let isMounted = true;
     const fetchFn = isAdmin ? fetchAllProjects : fetchManagedProjects;
     fetchFn()
       .then((data) => {
+        if (!isMounted) return;
         setProjects(data);
-        if (data.length > 0) {
+        if (data.length > 0 && !selectedProjectIdRef.current) {
           setSelectedProjectId(data[0].id);
         }
       })
-      .catch((err) => console.error("Failed to fetch projects", err));
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error("Failed to fetch projects", err);
+        setProjectError("Failed to load projects. Please try again.");
+      })
+      .finally(() => {
+        if (isMounted) setLoadingProjects(false);
+      });
+    return () => {
+      isMounted = false;
+    };
   }, [projectId, isAdmin]);
 
-  const loadRepository = useCallback(async (pId: string) => {
+  const loadRepository = useCallback(async (pId: string, force = false) => {
+    if (!pId) {
+      setRepo(null);
+      setLoading(false);
+      return;
+    }
     // Create a unique token for this specific load request.
     const requestToken = Symbol(pId);
     activeLoadRef.current = requestToken;
@@ -117,6 +141,17 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
     setLoadedTabs({});
     setActiveTab("overview");
 
+    // Check if we have cached repository info for this project
+    if (!force && pId in repoCacheRef.current) {
+      const cached = repoCacheRef.current[pId];
+      setRepo(cached);
+      setLoading(false);
+      if (cached?.default_branch) {
+        setBaseBranch(cached.default_branch);
+      }
+      return;
+    }
+
     try {
       const repository = await getProjectRepository(pId);
 
@@ -124,6 +159,7 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
       // this request was in flight.
       if (activeLoadRef.current !== requestToken) return;
 
+      repoCacheRef.current[pId] = repository;
       setRepo(repository);
       if (repository?.default_branch) {
         setBaseBranch(repository.default_branch);
@@ -140,6 +176,7 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
         msg.includes("no repository connected") ||
         msg.includes("no github repository connected")
       ) {
+        repoCacheRef.current[pId] = null;
         setRepo(null);
       } else {
         setError(err.message || "Failed to load repository info");
@@ -166,6 +203,7 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
       const newRepo = await connectRepository(selectedProjectId, {
         repository_url: repoUrl,
       });
+      repoCacheRef.current[selectedProjectId] = newRepo;
       setRepo(newRepo);
     } catch (err: any) {
       setError(err.message || "Failed to connect repository");
@@ -179,6 +217,7 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
       return;
     try {
       await disconnectRepository(selectedProjectId);
+      repoCacheRef.current[selectedProjectId] = null;
       setRepo(null);
     } catch (err: any) {
       setError(err.message || "Failed to disconnect repository");
@@ -192,6 +231,7 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
     setSyncMessage(null);
     try {
       const updated = await syncRepository(selectedProjectId);
+      repoCacheRef.current[selectedProjectId] = updated;
       setRepo(updated);
       setSyncMessage("Repository synchronized successfully with GitHub.");
       // Refresh tab data
@@ -362,14 +402,30 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
 
       {/* Project Selector */}
       <div className="glass-card p-4">
-        <label className="text-surface-400 text-xs uppercase font-semibold tracking-wider mb-2 block">
-          Select Project
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-surface-400 text-xs uppercase font-semibold tracking-wider block">
+            Select Project
+          </label>
+          {loadingProjects && (
+            <span className="text-surface-400 text-xs flex items-center gap-1.5 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-ping" />
+              Loading projects…
+            </span>
+          )}
+        </div>
         <select
           value={selectedProjectId}
           onChange={(e) => setSelectedProjectId(e.target.value)}
-          className="w-full bg-surface-900 border border-surface-700 rounded-lg px-4 py-2 text-surface-100 outline-none focus:border-primary-500 transition-colors"
+          disabled={loadingProjects && projects.length === 0}
+          className="w-full bg-surface-900 border border-surface-700 rounded-lg px-4 py-2 text-surface-100 outline-none focus:border-primary-500 transition-colors cursor-pointer"
         >
+          {loadingProjects && projects.length === 0 ? (
+            <option value="">Loading projects…</option>
+          ) : projectError && projects.length === 0 ? (
+            <option value="">Error loading projects</option>
+          ) : projects.length === 0 ? (
+            <option value="">No projects available</option>
+          ) : null}
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -378,8 +434,22 @@ export default function PMGitHubIntegrationPage({ projectId }: { projectId?: str
         </select>
       </div>
 
-      {loading ? (
-        <div className="text-surface-400 text-sm animate-pulse">
+      {loadingProjects && projects.length === 0 && !selectedProjectId ? (
+        <div className="glass-card p-12 text-center border border-surface-700/40 animate-pulse text-surface-400 text-sm">
+          Loading accessible projects...
+        </div>
+      ) : !loadingProjects && projects.length === 0 && !selectedProjectId ? (
+        <div className="glass-card p-12 text-center border-dashed border-2 border-surface-700/50">
+          <span className="text-4xl mb-3 block">📁</span>
+          <h3 className="text-lg font-bold text-surface-100 mb-1">
+            No projects available
+          </h3>
+          <p className="text-surface-400 text-sm">
+            {projectError || "You do not have any accessible projects assigned yet."}
+          </p>
+        </div>
+      ) : loading ? (
+        <div className="glass-card p-8 text-center text-surface-400 text-sm animate-pulse">
           Loading repository information...
         </div>
       ) : !repo ? (

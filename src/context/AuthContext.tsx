@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      setProfile((prev) => prev ?? optimistic);
+      setProfile((prev) => (prev && prev.id === session.user.id ? prev : optimistic));
       syncProfile(session.user);
     } else {
       setUser(null);

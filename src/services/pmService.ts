@@ -63,6 +63,8 @@ export async function fetchPMActivity(limit = 60, projectId?: string): Promise<P
   return apiFetch<PMActivityItem[]>(`/dashboard/pm-activity${qs}`);
 }
 
+import { fetchProjectsWithCache, invalidateProjectsCache } from "./projectsCache";
+
 // ---------------------------------------------------------------------------
 // Projects (PM-scoped)
 // ---------------------------------------------------------------------------
@@ -71,9 +73,11 @@ export async function fetchPMActivity(limit = 60, projectId?: string): Promise<P
  * Fetch all projects managed by the current PM.
  * Backend enforces the filter via project_manager_id.
  */
-export async function fetchManagedProjects(statusFilter?: string): Promise<Project[]> {
-  const qs = statusFilter ? `?status=${statusFilter}` : "";
-  return apiFetch<Project[]>(`/projects${qs}`);
+export async function fetchManagedProjects(statusFilter?: string, forceRefresh = false): Promise<Project[]> {
+  if (statusFilter) {
+    return apiFetch<Project[]>(`/projects?status=${statusFilter}`);
+  }
+  return fetchProjectsWithCache(() => apiFetch<Project[]>("/projects"), forceRefresh);
 }
 
 /**
@@ -89,10 +93,12 @@ export async function updateManagedProject(
     end_date?: string;
   }
 ): Promise<Project> {
-  return apiFetch<Project>(`/projects/${projectId}`, {
+  const updated = await apiFetch<Project>(`/projects/${projectId}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
+  invalidateProjectsCache();
+  return updated;
 }
 
 // ---------------------------------------------------------------------------
