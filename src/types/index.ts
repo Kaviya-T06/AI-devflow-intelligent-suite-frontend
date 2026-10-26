@@ -638,6 +638,11 @@ export interface Notification {
   is_read: boolean;
   read_at?: string | null;
   created_at: string;
+  project_name?: string | null;
+  task_title?: string | null;
+  assigned_to_name?: string | null;
+  due_date?: string | null;
+  days_overdue?: number | null;
 }
 
 export interface NotificationListResponse {

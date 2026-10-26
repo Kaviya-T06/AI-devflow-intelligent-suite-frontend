@@ -452,7 +452,7 @@ export default function MyProjectsPage() {
                       className="flex-1 btn-secondary text-xs py-2 flex items-center justify-center gap-1.5 transition-all duration-200"
                       title={`View details for ${p.name}`}
                     >
-                      <span>Details</span>
+                      <span>View Details</span>
                     </button>
                     <button
                       onClick={() => navigate(`/dashboard/my-tasks?project=${p.id}`)}

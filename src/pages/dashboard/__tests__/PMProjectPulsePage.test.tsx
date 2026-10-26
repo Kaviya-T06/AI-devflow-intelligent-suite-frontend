@@ -9,7 +9,7 @@ import {
   fetchPulseRecommendations,
   fetchPulseBriefing,
 } from '../../../services/pmService';
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 
 vi.mock('../../../services/pmService', () => ({
   fetchPMDashboardStats: vi.fn(),
@@ -675,6 +675,120 @@ describe('PMProjectPulsePage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Executive Project Briefing')).toBeInTheDocument();
+    });
+  });
+
+  it('refines recovery recommendations by removing duplicate cards and unifying each overdue task into a single card with top summary counts', async () => {
+    const mockGroupedRecs = {
+      project_id: 'proj-1',
+      project_name: 'Project 1',
+      health_score: 75,
+      health_data_completeness: 'High',
+      source: 'gemini',
+      ai_status: 'SUCCESS',
+      ai_notice: null,
+      generated_at: '2026-10-11T12:00:00Z',
+      recommendations: [
+        {
+          id: 'rec-1',
+          category: 'RISK_MITIGATION',
+          title: 'Resolve Critical Risk: DB down',
+          explanation: 'Postgres primary database connection pool exhausted for API Migration, assigned to Dev One.',
+          why_it_matters: 'Directly penalizes health score by 15 points and blocks sprint tasks.',
+          missing_info_or_assumptions: 'Confirmation of failover replica status.',
+          confidence: 'High',
+          confidence_rationale: 'Derived from verified open risk and -15 health score penalty formula.',
+          supporting_references: [
+            { type: 'risk', id: 'risk-1', label: 'DB down' },
+            { type: 'task', id: 'task-10', label: 'API Migration' },
+          ],
+        },
+        {
+          id: 'rec-2',
+          category: 'TASK_REVIEW',
+          title: 'Review Overdue Task: API Migration',
+          explanation: 'Task is overdue by 2 days and assigned to Dev One.',
+          why_it_matters: 'Delays backend release timeline.',
+          missing_info_or_assumptions: 'Requires sync with assigned developer.',
+          confidence: 'High',
+          confidence_rationale: 'Defensible deterministic due date check.',
+          supporting_references: [
+            { type: 'task', id: 'task-10', label: 'API Migration' },
+          ],
+        },
+        {
+          id: 'rec-3',
+          category: 'ALLOCATION_OPPORTUNITY',
+          title: 'Consider Assigning Dev Two to Task: Auth Flow',
+          explanation: 'Smart Allocation matched Dev Two with 92% compatibility based on skills and capacity.',
+          why_it_matters: 'Accelerates completion of blocked auth components.',
+          missing_info_or_assumptions: 'Verify availability during sprint.',
+          confidence: 'High',
+          confidence_rationale: 'Computed via Smart Allocation multi-factor scoring.',
+          supporting_references: [
+            { type: 'developer', id: 'dev-2', label: 'Dev Two (92% match)' },
+            { type: 'task', id: 'task-20', label: 'Auth Flow' },
+          ],
+        },
+      ],
+    };
+
+    vi.mocked(fetchPMDashboardStats).mockResolvedValue(mockStats as any);
+    vi.mocked(fetchPMRisks).mockResolvedValue(mockRisks as any);
+    vi.mocked(fetchPMActivity).mockResolvedValue(mockActivity as any);
+    vi.mocked(fetchPulseRecommendations).mockResolvedValue(mockGroupedRecs as any);
+    vi.mocked(fetchPulseBriefing).mockResolvedValue(mockBriefingProj1 as any);
+
+    render(
+      <MemoryRouter>
+        <PMProjectPulsePage />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Executive Project Briefing')).toBeInTheDocument();
+    });
+
+    const recsTab = screen.getByRole('button', { name: /Recovery Recommendations/i });
+    fireEvent.click(recsTab);
+
+    // Verify Top Summary Metrics
+    await waitFor(() => {
+      expect(screen.getByText('Total High-Risk Items')).toBeInTheDocument();
+      expect(screen.getByText('Total Overdue Tasks')).toBeInTheDocument();
+    });
+
+    // Verify Single Unified Card per Overdue Task (no duplicate cards)
+    const overdueHeaders = screen.getAllByText('Review Overdue Task: API Migration');
+    expect(overdueHeaders).toHaveLength(1);
+
+    // Verify Combined Risk Information inside the single card
+    expect(screen.getByText(/Resolve Critical Risk: DB down/i)).toBeInTheDocument();
+
+    // Verify Developer, Status, and Due Date
+    expect(screen.getAllByText('Dev One').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Specific Recommended Action:/i)).toBeInTheDocument();
+
+    // Verify Action links
+    expect(screen.getByRole('link', { name: /View Task →/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Inspect Risk →/i })).toBeInTheDocument();
+
+    // Verify Expandable Evidence, Assumptions & Methodology
+    expect(screen.getByText(/Hide Evidence & Assumptions/i)).toBeInTheDocument();
+
+    // Verify Allocation Opportunities are preserved
+    expect(screen.getByText('Consider Assigning Dev Two to Task: Auth Flow')).toBeInTheDocument();
+
+    // Verify Shared Methodology Section is preserved and expandable
+    const methodologyBtn = screen.getByText('Calculation Methodology & Health Penalty Rules');
+    expect(methodologyBtn).toBeInTheDocument();
+    fireEvent.click(methodologyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Critical Risk Deduction/i)).toBeInTheDocument();
+      expect(screen.getByText(/-15 points/i)).toBeInTheDocument();
+      expect(screen.getByText(/Overdue Task Deduction/i)).toBeInTheDocument();
+      expect(screen.getByText(/-3 points/i)).toBeInTheDocument();
     });
   });
 });

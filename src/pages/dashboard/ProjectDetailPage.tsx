@@ -124,12 +124,16 @@ function statusBadge(status?: string | null) {
 // ---------------------------------------------------------------------------
 
 function OverviewTab({ project, tasks }: { project: Project; tasks: Task[] }) {
-  const total    = tasks.length;
-  const done     = tasks.filter((t) => t.status === "COMPLETED").length;
-  const inProg   = tasks.filter((t) => t.status === "IN_PROGRESS").length;
-  const rev      = tasks.filter((t) => t.status === "REVIEW").length;
-  const todo     = tasks.filter((t) => t.status === "TODO").length;
-  const overdue  = tasks.filter((t) => t.due_date && t.status !== "COMPLETED" && new Date() > new Date(t.due_date)).length;
+  const scopedTasks = useMemo(
+    () => tasks.filter((t) => !t.project_id || String(t.project_id).toLowerCase() === String(project.id).toLowerCase()),
+    [tasks, project.id]
+  );
+  const total    = scopedTasks.length;
+  const done     = scopedTasks.filter((t) => t.status === "COMPLETED").length;
+  const inProg   = scopedTasks.filter((t) => t.status === "IN_PROGRESS").length;
+  const rev      = scopedTasks.filter((t) => t.status === "REVIEW").length;
+  const todo     = scopedTasks.filter((t) => t.status === "TODO").length;
+  const overdue  = scopedTasks.filter((t) => t.due_date && t.status !== "COMPLETED" && new Date() > new Date(t.due_date)).length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -182,11 +186,16 @@ function OverviewTab({ project, tasks }: { project: Project; tasks: Task[] }) {
 // Tasks Tab
 // ---------------------------------------------------------------------------
 
-function TasksTab({ tasks, loading }: { tasks: Task[]; loading: boolean }) {
+function TasksTab({ tasks, loading, projectId }: { tasks: Task[]; loading: boolean; projectId?: string }) {
   const [filter, setFilter] = useState("ALL");
+  const scopedTasks = useMemo(() => {
+    if (!projectId) return tasks;
+    return tasks.filter((t) => !t.project_id || String(t.project_id).toLowerCase() === String(projectId).toLowerCase());
+  }, [tasks, projectId]);
+
   const filtered = useMemo(
-    () => filter === "ALL" ? tasks : tasks.filter((t) => t.status === filter),
-    [tasks, filter]
+    () => filter === "ALL" ? scopedTasks : scopedTasks.filter((t) => t.status === filter),
+    [scopedTasks, filter]
   );
   const sCls: Record<string, string> = {
     TODO:        "bg-surface-700/50 text-surface-300",
@@ -814,7 +823,17 @@ function HistoryTab({ projectId, projectName, tasks }: { projectId: string; proj
       fetchProjectHistory(projectId).catch(() => [] as ActivityLog[]),
       getProjectRepository(projectId).catch(() => null),
     ]).then(async ([ls, repo]) => {
-      setLogs(ls);
+      // Ensure logs only belong to this selected project
+      const scopedLogs = (ls || []).filter((l) => {
+        if (l.project_id && String(l.project_id).toLowerCase() !== String(projectId).toLowerCase()) {
+          return false;
+        }
+        if (l.entity_type === "project" && l.entity_id && String(l.entity_id).toLowerCase() !== String(projectId).toLowerCase()) {
+          return false;
+        }
+        return true;
+      });
+      setLogs(scopedLogs);
       if (repo) {
         const [c, p] = await Promise.all([
           getCommits(projectId).catch(() => [] as GitHubCommit[]),
@@ -826,10 +845,14 @@ function HistoryTab({ projectId, projectName, tasks }: { projectId: string; proj
       .finally(() => setLoading(false));
   }, [projectId]);
 
-  const total  = tasks.length;
-  const done   = tasks.filter((t) => t.status === "COMPLETED").length;
-  const inProg = tasks.filter((t) => t.status === "IN_PROGRESS").length;
-  const rev    = tasks.filter((t) => t.status === "REVIEW").length;
+  const scopedTasks = useMemo(
+    () => tasks.filter((t) => !t.project_id || String(t.project_id).toLowerCase() === String(projectId).toLowerCase()),
+    [tasks, projectId]
+  );
+  const total  = scopedTasks.length;
+  const done   = scopedTasks.filter((t) => t.status === "COMPLETED").length;
+  const inProg = scopedTasks.filter((t) => t.status === "IN_PROGRESS").length;
+  const rev    = scopedTasks.filter((t) => t.status === "REVIEW").length;
   const pct    = total > 0 ? Math.round((done / total) * 100) : 0;
 
   const unified = useMemo(() => {
@@ -1777,7 +1800,13 @@ export default function ProjectDetailPage() {
     if (!projectId) return;
     setTLoading(true);
     fetchProjectTasks(projectId)
-      .then(setTasks).catch(() => setTasks([]))
+      .then((data) => {
+        const scoped = (data || []).filter(
+          (t) => !t.project_id || String(t.project_id).toLowerCase() === String(projectId).toLowerCase()
+        );
+        setTasks(scoped);
+      })
+      .catch(() => setTasks([]))
       .finally(() => setTLoading(false));
   }, [projectId]);
 
@@ -1943,7 +1972,7 @@ export default function ProjectDetailPage() {
       {/* Tab content */}
       <div>
         {activeTab === "overview" && <OverviewTab project={project} tasks={tasks} />}
-        {activeTab === "tasks"    && <TasksTab tasks={tasks} loading={tLoading} />}
+        {activeTab === "tasks"    && <TasksTab tasks={tasks} loading={tLoading} projectId={project.id} />}
         {activeTab === "github"   && <GitHubTab projectId={project.id} />}
         {activeTab === "history"  && <HistoryTab projectId={project.id} projectName={project.name} tasks={tasks} />}
         {activeTab === "whatif" && isMgr && <WhatIfTab project={project} />}

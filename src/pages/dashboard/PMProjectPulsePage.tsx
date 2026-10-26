@@ -94,6 +94,17 @@ function PMProjectPulseCore({ searchParams, setSearchParams }: PMProjectPulseCor
   const [loadingRecs, setLoadingRecs] = useState(false);
   const [recsError, setRecsError] = useState<string | null>(null);
 
+  // Card-level & shared expansion state for Recovery Recommendations
+  const [expandedCardIds, setExpandedCardIds] = useState<Record<string, boolean>>({});
+  const [showMethodology, setShowMethodology] = useState(false);
+
+  const toggleCardExpanded = (id: string) => {
+    setExpandedCardIds((prev) => ({
+      ...prev,
+      [id]: !(prev[id] ?? true),
+    }));
+  };
+
   // Phase 5: AI Project Briefing State
   const [briefing, setBriefing] = useState<PulseBriefingResponse | null>(null);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
@@ -366,6 +377,253 @@ function PMProjectPulseCore({ searchParams, setSearchParams }: PMProjectPulseCor
         return `/dashboard/pm-team-tasks?project=${selectedProject.id}`;
     }
   };
+
+  // Deduplicated Unified Overdue Task model
+  interface UnifiedOverdueTask {
+    key: string;
+    taskId: string;
+    taskTitle: string;
+    assigneeName: string;
+    dueDate: string;
+    status: string;
+    hasRisk: boolean;
+    riskId?: string;
+    riskTitle?: string;
+    riskSeverity?: string;
+    riskDetails?: string;
+    specificRecommendedAction: string;
+    taskRec?: PulseRecommendation;
+    riskRec?: PulseRecommendation;
+    evidenceReferences: SupportingReference[];
+    assumptions: string[];
+    methodologies: string[];
+    confidence: string;
+  }
+
+  // Grouping & deduplication for Recovery Recommendations
+  const allRecs = recommendations?.recommendations || [];
+
+  const riskMitigationRecs = allRecs.filter((r) => r.category === "RISK_MITIGATION");
+  const taskReviewRecs = allRecs.filter((r) => r.category === "TASK_REVIEW");
+  const allocationRecs = allRecs.filter((r) => r.category === "ALLOCATION_OPPORTUNITY");
+  const otherRecs = allRecs.filter(
+    (r) => !["RISK_MITIGATION", "TASK_REVIEW", "ALLOCATION_OPPORTUNITY"].includes(r.category)
+  );
+
+  const getTaskInfoFromRec = (rec: PulseRecommendation) => {
+    const taskRef = rec.supporting_references?.find((ref) => ref.type === "task");
+    if (taskRef) {
+      return { id: taskRef.id, label: taskRef.label.replace(/^Task:\s*/i, "") };
+    }
+    if (rec.actionable_entity_type === "task" && rec.actionable_entity_id) {
+      const match = rec.title.match(/Task:\s*(.+)$/i);
+      return { id: rec.actionable_entity_id, label: match ? match[1] : rec.actionable_entity_id };
+    }
+    const match = rec.title.match(/Overdue Task:\s*(.+)$/i);
+    if (match) {
+      return { id: match[1].toLowerCase().replace(/\s+/g, "-"), label: match[1].trim() };
+    }
+    return null;
+  };
+
+  const unifiedOverdueTasks: UnifiedOverdueTask[] = [];
+  const claimedRiskRecIds = new Set<string>();
+
+  // 1. Process all task review recommendations into single unified cards
+  taskReviewRecs.forEach((tRec) => {
+    const tInfo = getTaskInfoFromRec(tRec);
+    const taskId = tInfo?.id || tRec.actionable_entity_id || tRec.id;
+    const taskTitle = tInfo?.label || tRec.title.replace(/^Review\s+Overdue\s+Task:\s*/i, "");
+
+    // Link corresponding risk recommendation if present
+    const linkedRiskRec = riskMitigationRecs.find((rRec) => {
+      const rTaskInfo = getTaskInfoFromRec(rRec);
+      return (
+        (rTaskInfo && rTaskInfo.id === taskId) ||
+        (rTaskInfo && rTaskInfo.label.toLowerCase() === taskTitle.toLowerCase()) ||
+        rRec.explanation.toLowerCase().includes(taskTitle.toLowerCase())
+      );
+    });
+
+    if (linkedRiskRec) {
+      claimedRiskRecIds.add(linkedRiskRec.id);
+    }
+
+    // Link database risk record from projectRisks if present
+    const linkedDbRisk = projectRisks.find(
+      (r) =>
+        (r.task_id && String(r.task_id) === String(taskId)) ||
+        (r.title && r.title.toLowerCase().includes(taskTitle.toLowerCase()))
+    );
+
+    // Extract Developer
+    let assigneeName = "Unassigned";
+    const assigneeMatch =
+      tRec.explanation.match(/assigned to ([^).,]+)/i) ||
+      (linkedRiskRec && linkedRiskRec.explanation.match(/assigned to ([^).,]+)/i));
+    if (assigneeMatch && assigneeMatch[1]) {
+      assigneeName = assigneeMatch[1].trim();
+    } else {
+      const devRef = [...(tRec.supporting_references || []), ...(linkedRiskRec?.supporting_references || [])].find(
+        (ref) => ref.type === "developer"
+      );
+      if (devRef) {
+        assigneeName = devRef.label.replace(/^Developer:\s*/i, "").split(" ")[0];
+      }
+    }
+
+    // Extract Due Date
+    let dueDate = "Overdue";
+    const dueMatch =
+      tRec.explanation.match(/by\s+([0-9]{4}-[0-9]{2}-[0-9]{2}(?:T[0-9:]+)?)/i) ||
+      tRec.explanation.match(/overdue by\s+([^,.]+)/i);
+    if (dueMatch && dueMatch[1]) {
+      dueDate = dueMatch[1].trim();
+    }
+
+    // Extract Status
+    let status = "Delayed";
+    const statusMatch = tRec.explanation.match(/in\s+([A-Z_]+)\s+state/i);
+    if (statusMatch && statusMatch[1]) {
+      status = statusMatch[1].trim();
+    }
+
+    // Risk details
+    const hasRisk = Boolean(linkedRiskRec || linkedDbRisk);
+    const riskSeverity =
+      linkedDbRisk?.severity ||
+      (linkedRiskRec && /critical/i.test(linkedRiskRec.title) ? "Critical" : "High") ||
+      "Schedule";
+    const riskTitle =
+      linkedRiskRec?.title.replace(/^Resolve\s+(Critical|High|Medium|Low)\s+Risk:\s*/i, "") ||
+      linkedDbRisk?.title ||
+      (hasRisk ? "Delivery Risk" : "Schedule Lag");
+    const riskId = linkedRiskRec?.actionable_entity_id || linkedRiskRec?.id || linkedDbRisk?.id;
+    const riskDetails =
+      linkedRiskRec?.why_it_matters ||
+      linkedDbRisk?.description ||
+      (hasRisk
+        ? "Threatens sprint delivery and applies deterministic health score deduction."
+        : "Past due date applies an unmitigated penalty (-3 pts) to project health score.");
+
+    // Practical, specific recommended action
+    let action = "";
+    if (hasRisk && assigneeName !== "Unassigned") {
+      action = `Resolve ${riskTitle} with ${assigneeName}: verify root cause and system dependencies, unblock the pull request review, and adjust target milestone to avert further health deductions.`;
+    } else if (hasRisk) {
+      action = `Assign an owner immediately to resolve ${riskTitle} on ${taskTitle}, inspect blocking infrastructure, and re-estimate delivery schedule.`;
+    } else if (assigneeName !== "Unassigned") {
+      action = `Conduct an urgent check-in with ${assigneeName} on ${taskTitle}: identify delivery bottlenecks, confirm PR status (${status}), and establish a realistic completion date.`;
+    } else {
+      action = `Assign an available developer with matching skills to ${taskTitle} and set an updated sprint delivery target.`;
+    }
+
+    // Combine Supporting References
+    const refMap = new Map<string, SupportingReference>();
+    (tRec.supporting_references || []).forEach((r) => refMap.set(`${r.type}:${r.id}`, r));
+    (linkedRiskRec?.supporting_references || []).forEach((r) => refMap.set(`${r.type}:${r.id}`, r));
+    if (hasRisk && riskId && !refMap.has(`risk:${riskId}`)) {
+      refMap.set(`risk:${riskId}`, { type: "risk", id: riskId, label: `${riskSeverity} Risk: ${riskTitle}` });
+    }
+    if (!refMap.has(`task:${taskId}`)) {
+      refMap.set(`task:${taskId}`, { type: "task", id: taskId, label: `Task: ${taskTitle}` });
+    }
+
+    // Assumptions
+    const assumptions: string[] = [];
+    if (tRec.missing_info_or_assumptions) assumptions.push(tRec.missing_info_or_assumptions);
+    if (
+      linkedRiskRec?.missing_info_or_assumptions &&
+      linkedRiskRec.missing_info_or_assumptions !== tRec.missing_info_or_assumptions
+    ) {
+      assumptions.push(linkedRiskRec.missing_info_or_assumptions);
+    }
+
+    // Methodologies
+    const methodologies: string[] = [];
+    if (tRec.confidence_rationale) methodologies.push(tRec.confidence_rationale);
+    if (
+      linkedRiskRec?.confidence_rationale &&
+      linkedRiskRec.confidence_rationale !== tRec.confidence_rationale
+    ) {
+      methodologies.push(linkedRiskRec.confidence_rationale);
+    }
+
+    unifiedOverdueTasks.push({
+      key: `unified-task-${taskId}`,
+      taskId,
+      taskTitle,
+      assigneeName,
+      dueDate,
+      status,
+      hasRisk,
+      riskId,
+      riskTitle,
+      riskSeverity,
+      riskDetails,
+      specificRecommendedAction: action,
+      taskRec: tRec,
+      riskRec: linkedRiskRec,
+      evidenceReferences: Array.from(refMap.values()),
+      assumptions,
+      methodologies,
+      confidence: tRec.confidence || linkedRiskRec?.confidence || "High",
+    });
+  });
+
+  // 2. Process any risk mitigation recommendations tied to a task not yet unified
+  riskMitigationRecs.forEach((rRec) => {
+    if (claimedRiskRecIds.has(rRec.id)) return;
+    const tInfo = getTaskInfoFromRec(rRec);
+    if (!tInfo) return; // Standalone risk
+
+    const existing = unifiedOverdueTasks.find(
+      (u) => u.taskId === tInfo.id || u.taskTitle.toLowerCase() === tInfo.label.toLowerCase()
+    );
+    if (existing) {
+      claimedRiskRecIds.add(rRec.id);
+      return;
+    }
+
+    claimedRiskRecIds.add(rRec.id);
+    const taskId = tInfo.id;
+    const taskTitle = tInfo.label;
+    const riskSeverity = /critical/i.test(rRec.title) ? "Critical" : "High";
+    const riskTitle = rRec.title.replace(/^Resolve\s+(Critical|High|Medium|Low)\s+Risk:\s*/i, "");
+    const riskId = rRec.actionable_entity_id || rRec.id;
+
+    let assigneeName = "Unassigned";
+    const match = rRec.explanation.match(/assigned to ([^).,]+)/i);
+    if (match && match[1]) assigneeName = match[1].trim();
+
+    unifiedOverdueTasks.push({
+      key: `unified-risk-task-${taskId}`,
+      taskId,
+      taskTitle,
+      assigneeName,
+      dueDate: "Overdue",
+      status: "Delayed",
+      hasRisk: true,
+      riskId,
+      riskTitle,
+      riskSeverity,
+      riskDetails: rRec.why_it_matters || rRec.explanation,
+      specificRecommendedAction: `Execute urgent mitigation on ${riskTitle} with ${assigneeName}: resolve delivery blocker, confirm test passes, and reset sprint timeline.`,
+      riskRec: rRec,
+      evidenceReferences: rRec.supporting_references || [],
+      assumptions: rRec.missing_info_or_assumptions ? [rRec.missing_info_or_assumptions] : [],
+      methodologies: rRec.confidence_rationale ? [rRec.confidence_rationale] : [],
+      confidence: rRec.confidence || "High",
+    });
+  });
+
+  // Standalone risk recommendations (not tied to an overdue task)
+  const standaloneRiskRecs = riskMitigationRecs.filter((r) => !claimedRiskRecIds.has(r.id));
+
+  // Top summary metrics
+  const dbHighRisks = projectRisks.filter((r) => r.severity === "Critical" || r.severity === "High");
+  const totalHighRiskCount = Math.max(dbHighRisks.length, riskMitigationRecs.length);
+  const totalOverdueTaskCount = Math.max(overdueTasks, unifiedOverdueTasks.length);
 
   // GitHub Context from briefing if present
   const githubContext = briefing?.sections?.github_context;
@@ -680,7 +938,7 @@ function PMProjectPulseCore({ searchParams, setSearchParams }: PMProjectPulseCor
             }`}
           >
             <span>📄</span>
-            <span>Project Briefing (Phase 5)</span>
+            <span>Project Briefing</span>
           </button>
           <button
             id="tab-recommendations"
@@ -1123,84 +1381,616 @@ function PMProjectPulseCore({ searchParams, setSearchParams }: PMProjectPulseCor
             )}
 
             {recommendations && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {recommendations.recommendations.length === 0 ? (
                   <p className="text-surface-400 text-sm italic text-center py-6">
                     No active recovery blockers detected. Project health is on track.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {recommendations.recommendations.map((rec) => (
-                      <div
-                        key={rec.id}
-                        className="p-4 bg-surface-800/60 rounded-xl border border-surface-700/60 flex flex-col justify-between hover:border-surface-600 transition-colors"
-                      >
-                        <div>
-                          {/* Top Badges */}
-                          <div className="flex justify-between items-start gap-2 mb-2">
-                            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${getCategoryBadgeClass(rec.category)}`}>
-                              {rec.category.replace(/_/g, " ")}
+                  <>
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {/* TOP SUMMARY METRICS: TOTAL HIGH-RISK & OVERDUE TASKS COUNTS */}
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* High-Risk Items Metric */}
+                      <div className="p-4 rounded-xl bg-surface-900/60 border border-rose-500/30 flex items-center justify-between shadow-sm">
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>🚨</span> Total High-Risk Items
+                          </p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl font-extrabold text-surface-100">
+                              {totalHighRiskCount}
                             </span>
-                            <span
-                              className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${getConfidenceBadgeClass(rec.confidence)}`}
-                              title={rec.confidence_rationale}
-                            >
-                              {rec.confidence} Confidence
+                            <span className="text-xs text-surface-400">
+                              {totalHighRiskCount === 1 ? "high-risk item" : "high-risk items"}
                             </span>
                           </div>
+                          <p className="text-[11px] text-surface-400">
+                            Critical & high severity delivery risks across sprint scope
+                          </p>
+                        </div>
+                        <NavLink
+                          to={`/dashboard/pm-workflow-risks?project=${encodeURIComponent(selectedProject.name)}`}
+                          className="text-xs px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 font-medium shrink-0"
+                          title="Inspect all project risks in Risk Radar"
+                        >
+                          Risk Radar →
+                        </NavLink>
+                      </div>
 
-                          {/* Title & Explanation */}
-                          <h4 className="text-sm font-semibold text-surface-100">{rec.title}</h4>
-                          <p className="text-xs text-surface-300 mt-1.5 leading-relaxed">{rec.explanation}</p>
-
-                          {/* Why it matters */}
-                          <div className="mt-3 p-2.5 bg-surface-900/60 rounded-lg border border-surface-700/40 text-xs">
-                            <span className="font-semibold text-primary-400">Why it matters: </span>
-                            <span className="text-surface-300">{rec.why_it_matters}</span>
+                      {/* Overdue Tasks Metric */}
+                      <div className="p-4 rounded-xl bg-surface-900/60 border border-amber-500/30 flex items-center justify-between shadow-sm">
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>⏱️</span> Total Overdue Tasks
+                          </p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl font-extrabold text-surface-100">
+                              {totalOverdueTaskCount}
+                            </span>
+                            <span className="text-xs text-surface-400">
+                              {totalOverdueTaskCount === 1 ? "overdue task" : "overdue tasks"}
+                            </span>
                           </div>
+                          <p className="text-[11px] text-surface-400">
+                            Tasks past due date consolidated into single recovery actions
+                          </p>
+                        </div>
+                        <NavLink
+                          to={`/dashboard/pm-team-tasks?project=${selectedProject.id}`}
+                          className="text-xs px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium shrink-0"
+                          title="Inspect all team tasks"
+                        >
+                          Team Tasks →
+                        </NavLink>
+                      </div>
+                    </div>
 
-                          {/* Supporting References with Actionable Deep Links */}
-                          {rec.supporting_references && rec.supporting_references.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-1.5 items-center">
-                              <span className="text-[11px] text-surface-500 mr-1">Evidence:</span>
-                              {rec.supporting_references.map((ref, idx) => (
-                                <NavLink
-                                  key={idx}
-                                  to={getReferenceLink(ref.type, ref.id)}
-                                  className="text-[11px] px-2 py-0.5 rounded bg-surface-700/60 text-surface-300 border border-surface-600/50 flex items-center gap-1 hover:border-primary-500/50 hover:text-primary-300 transition-colors"
-                                  title={`Inspect ${ref.type}: ${ref.label}`}
-                                >
-                                  <span>{getReferenceIcon(ref.type)}</span>
-                                  <span className="truncate max-w-[180px]">{ref.label}</span>
-                                </NavLink>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Assumptions or Missing Info */}
-                          {rec.missing_info_or_assumptions && (
-                            <p className="text-[11px] text-surface-500 mt-2.5 italic">
-                              <span className="text-yellow-500/80 not-italic font-medium">Assumptions: </span>
-                              {rec.missing_info_or_assumptions}
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {/* UNIFIED OVERDUE TASKS (ONE CARD PER OVERDUE TASK)           */}
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {unifiedOverdueTasks.length > 0 && (
+                      <div className="space-y-3 pt-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1.5 border-b border-surface-800">
+                          <div>
+                            <h4 className="text-sm font-bold text-surface-200 flex items-center gap-2">
+                              <span>⏱️</span>
+                              <span>Overdue Task Recovery Actions</span>
+                              <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                                {unifiedOverdueTasks.length} {unifiedOverdueTasks.length === 1 ? "Overdue Task" : "Overdue Tasks"}
+                              </span>
+                            </h4>
+                            <p className="text-[11px] text-surface-400 mt-0.5">
+                              Each overdue task displayed only once, combining risk info, assigned developer, due date, status, and targeted recovery action.
                             </p>
-                          )}
+                          </div>
                         </div>
 
-                        <div className="mt-3 pt-2.5 border-t border-surface-700/30 flex justify-between items-center text-[10px] text-surface-500">
-                          <span>Method: {rec.confidence_rationale}</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {unifiedOverdueTasks.map((task) => (
+                            <div
+                              key={task.key}
+                              className="p-5 bg-surface-900/70 rounded-xl border border-amber-500/30 flex flex-col justify-between hover:border-amber-500/50 transition-colors shadow-sm"
+                            >
+                              <div className="space-y-3.5">
+                                {/* Top Badges */}
+                                <div className="flex flex-wrap justify-between items-start gap-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 tracking-wide uppercase">
+                                      Overdue Task
+                                    </span>
+                                    {task.hasRisk && (
+                                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 tracking-wide uppercase">
+                                        🚨 {task.riskSeverity} Risk Linked
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${getConfidenceBadgeClass(task.confidence)}`}
+                                  >
+                                    {task.confidence} Confidence
+                                  </span>
+                                </div>
+
+                                {/* Task Title & Context */}
+                                <div>
+                                  <h4 className="text-base font-semibold text-surface-100 flex items-center gap-2">
+                                    <span>Review Overdue Task: {task.taskTitle}</span>
+                                  </h4>
+                                  {task.taskRec && (
+                                    <p className="text-xs text-surface-300 mt-1 leading-relaxed">
+                                      {task.taskRec.explanation}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Developer, Due Date, Status Metadata */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-lg bg-surface-800/60 border border-surface-700/50 text-xs">
+                                  <div>
+                                    <span className="text-[10px] text-surface-500 uppercase tracking-wider block font-medium">Assigned Developer</span>
+                                    <span className="text-surface-200 font-semibold flex items-center gap-1.5 mt-0.5">
+                                      <span>👤</span>
+                                      <span>{task.assigneeName}</span>
+                                    </span>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-[10px] text-surface-500 uppercase tracking-wider block font-medium">Target Due Date</span>
+                                    <span className="text-amber-400 font-semibold flex items-center gap-1.5 mt-0.5">
+                                      <span>📅</span>
+                                      <span>{task.dueDate}</span>
+                                    </span>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-[10px] text-surface-500 uppercase tracking-wider block font-medium">Task Status</span>
+                                    <span className="text-surface-200 font-semibold flex items-center gap-1.5 mt-0.5">
+                                      <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                                      <span>{task.status}</span>
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Combined Risk Information Block */}
+                                <div className={`p-3 rounded-lg border text-xs space-y-1.5 ${
+                                  task.hasRisk
+                                    ? "bg-rose-500/10 border-rose-500/25 text-rose-200"
+                                    : "bg-surface-800/40 border-surface-700/40 text-surface-300"
+                                }`}>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-semibold flex items-center gap-1.5">
+                                      <span>{task.hasRisk ? "🚨" : "⏱️"}</span>
+                                      <span className={task.hasRisk ? "text-rose-300 font-bold" : "text-surface-300"}>
+                                        {task.hasRisk
+                                          ? `Resolve ${task.riskSeverity} Risk: ${task.riskTitle}`
+                                          : `Schedule Risk: ${task.riskTitle}`}
+                                      </span>
+                                    </span>
+
+                                    {task.riskId && (
+                                      <NavLink
+                                        to={getReferenceLink("risk", task.riskId)}
+                                        className="text-[11px] underline text-rose-300 hover:text-rose-100 shrink-0 font-medium"
+                                        title={`Inspect risk details: ${task.riskTitle}`}
+                                      >
+                                        Inspect Risk →
+                                      </NavLink>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] leading-relaxed text-surface-300">
+                                    {task.riskDetails}
+                                  </p>
+                                </div>
+
+                                {/* Specific Recommended Action */}
+                                <div className="p-3 rounded-lg bg-primary-500/10 border border-primary-500/20 text-xs space-y-1">
+                                  <span className="font-bold text-primary-300 flex items-center gap-1.5">
+                                    <span>⚡</span>
+                                    <span>Specific Recommended Action:</span>
+                                  </span>
+                                  <p className="text-surface-200 leading-relaxed text-[11px]">
+                                    {task.specificRecommendedAction}
+                                  </p>
+                                </div>
+
+                                {/* Navigation Action Links */}
+                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                  <NavLink
+                                    to={getReferenceLink("task", task.taskId)}
+                                    className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 hover:text-primary-300"
+                                    title={`View task details: ${task.taskTitle}`}
+                                  >
+                                    <span>📋</span>
+                                    <span>View Task →</span>
+                                  </NavLink>
+                                  {task.riskId && (
+                                    <NavLink
+                                      to={getReferenceLink("risk", task.riskId)}
+                                      className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 hover:text-rose-300 text-rose-200 border-rose-500/30"
+                                      title={`Inspect risk details: ${task.riskTitle}`}
+                                    >
+                                      <span>🚨</span>
+                                      <span>Inspect Risk Details →</span>
+                                    </NavLink>
+                                  )}
+                                </div>
+
+                                {/* Expandable Section: Evidence, Assumptions & Method */}
+                                <div className="pt-2 border-t border-surface-700/40">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleCardExpanded(task.taskId)}
+                                    className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1.5 font-medium transition-colors focus:outline-none"
+                                    aria-expanded={expandedCardIds[task.taskId] ?? true}
+                                  >
+                                    <span>
+                                      {(expandedCardIds[task.taskId] ?? true)
+                                        ? "▲ Hide Evidence & Assumptions"
+                                        : "▼ View Evidence & Assumptions"}
+                                    </span>
+                                    <span className="text-[10px] text-surface-500">
+                                      ({task.evidenceReferences.length} evidence links)
+                                    </span>
+                                  </button>
+
+                                  {(expandedCardIds[task.taskId] ?? true) && (
+                                    <div className="mt-3 p-3 bg-surface-950/60 rounded-lg border border-surface-700/50 space-y-2.5 text-xs">
+                                      {/* Supporting Evidence */}
+                                      {task.evidenceReferences.length > 0 && (
+                                        <div>
+                                          <span className="text-[11px] font-semibold text-surface-400 block mb-1.5">
+                                            Supporting References & Evidence:
+                                          </span>
+                                          <div className="flex flex-wrap gap-1.5 items-center">
+                                            {task.evidenceReferences.map((ref, idx) => (
+                                              <NavLink
+                                                key={idx}
+                                                to={getReferenceLink(ref.type, ref.id)}
+                                                className="text-[11px] px-2 py-0.5 rounded bg-surface-800 text-surface-300 border border-surface-600/50 flex items-center gap-1 hover:border-primary-500/50 hover:text-primary-300 transition-colors"
+                                                title={`Inspect ${ref.type}: ${ref.label}`}
+                                              >
+                                                <span>{getReferenceIcon(ref.type)}</span>
+                                                <span className="truncate max-w-[200px]">{ref.label}</span>
+                                              </NavLink>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Assumptions */}
+                                      {task.assumptions.length > 0 && (
+                                        <div>
+                                          <span className="text-[11px] font-semibold text-yellow-400/90 block mb-0.5">
+                                            Assumptions:
+                                          </span>
+                                          <ul className="list-disc list-inside text-[11px] text-surface-400 space-y-0.5 italic">
+                                            {task.assumptions.map((assump, idx) => (
+                                              <li key={idx}>{assump}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+
+                                      {/* Methodology */}
+                                      {task.methodologies.length > 0 && (
+                                        <div className="pt-2 border-t border-surface-800/80 flex flex-wrap items-center justify-between text-[10px] text-surface-500 gap-2">
+                                          <span><strong>Method:</strong> {task.methodologies.join(" • ")}</span>
+                                          <span className="font-semibold text-surface-400">{task.confidence} Confidence</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
+
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {/* STANDALONE CRITICAL & HIGH-SEVERITY RISKS                    */}
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {standaloneRiskRecs.length > 0 && (
+                      <div className="space-y-3 pt-1">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-surface-800">
+                          <h4 className="text-sm font-bold text-surface-200 flex items-center gap-2">
+                            <span>🚨</span>
+                            <span>Critical & High-Severity Risks</span>
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium">
+                              {standaloneRiskRecs.length} {standaloneRiskRecs.length === 1 ? "Risk" : "Risks"}
+                            </span>
+                          </h4>
+                          <NavLink
+                            to={`/dashboard/pm-workflow-risks?project=${encodeURIComponent(selectedProject.name)}`}
+                            className="text-xs text-rose-300 hover:text-rose-200 flex items-center gap-1 font-medium"
+                          >
+                            Risk Radar →
+                          </NavLink>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {standaloneRiskRecs.map((rec) => (
+                            <div
+                              key={rec.id}
+                              className="p-4 bg-surface-800/60 rounded-xl border border-rose-500/30 flex flex-col justify-between hover:border-rose-500/50 transition-colors shadow-sm"
+                            >
+                              <div>
+                                <div className="flex justify-between items-start gap-2 mb-2">
+                                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${getCategoryBadgeClass(rec.category)}`}>
+                                    {rec.category.replace(/_/g, " ")}
+                                  </span>
+                                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${getConfidenceBadgeClass(rec.confidence)}`}>
+                                    {rec.confidence} Confidence
+                                  </span>
+                                </div>
+
+                                <h4 className="text-sm font-semibold text-surface-100">{rec.title}</h4>
+                                <p className="text-xs text-surface-300 mt-1.5 leading-relaxed">{rec.explanation}</p>
+
+                                <div className="mt-3 p-2.5 bg-surface-900/60 rounded-lg border border-surface-700/40 text-xs">
+                                  <span className="font-semibold text-rose-300">Why it matters: </span>
+                                  <span className="text-surface-300">{rec.why_it_matters}</span>
+                                </div>
+
+                                <div className="pt-2 border-t border-surface-700/40 mt-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleCardExpanded(rec.id)}
+                                    className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1.5 font-medium transition-colors focus:outline-none"
+                                    aria-expanded={expandedCardIds[rec.id] ?? true}
+                                  >
+                                    <span>
+                                      {(expandedCardIds[rec.id] ?? true)
+                                        ? "▲ Hide Evidence & Assumptions"
+                                        : "▼ View Evidence & Assumptions"}
+                                    </span>
+                                  </button>
+
+                                  {(expandedCardIds[rec.id] ?? true) && (
+                                    <div className="mt-2.5 p-2.5 bg-surface-950/60 rounded-lg border border-surface-700/50 space-y-2 text-xs">
+                                      {rec.supporting_references && rec.supporting_references.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 items-center">
+                                          <span className="text-[11px] text-surface-500 mr-1">Evidence:</span>
+                                          {rec.supporting_references.map((ref, idx) => (
+                                            <NavLink
+                                              key={idx}
+                                              to={getReferenceLink(ref.type, ref.id)}
+                                              className="text-[11px] px-2 py-0.5 rounded bg-surface-800 text-surface-300 border border-surface-600/50 flex items-center gap-1 hover:border-primary-500/50 hover:text-primary-300 transition-colors"
+                                              title={`Inspect ${ref.type}: ${ref.label}`}
+                                            >
+                                              <span>{getReferenceIcon(ref.type)}</span>
+                                              <span className="truncate max-w-[180px]">{ref.label}</span>
+                                            </NavLink>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {rec.missing_info_or_assumptions && (
+                                        <p className="text-[11px] text-surface-400 italic">
+                                          <span className="text-yellow-400/90 not-italic font-medium">Assumptions: </span>
+                                          {rec.missing_info_or_assumptions}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="mt-3 pt-2.5 border-t border-surface-700/30 flex justify-between items-center text-[10px] text-surface-500">
+                                <span>Method: {rec.confidence_rationale}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {/* PRIORITY 3: ALLOCATION OPPORTUNITIES (DISTINCT CARDS)        */}
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {allocationRecs.length > 0 && (
+                      <div className="space-y-3 pt-1">
+                        <div className="flex items-center justify-between pb-1.5 border-b border-surface-800">
+                          <h4 className="text-sm font-bold text-surface-200 flex items-center gap-2">
+                            <span>💡</span>
+                            <span>Developer Allocation Opportunities</span>
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
+                              {allocationRecs.length} {allocationRecs.length === 1 ? "Opportunity" : "Opportunities"}
+                            </span>
+                          </h4>
+                          <NavLink
+                            to={`/dashboard/pm-smart-allocation?project=${selectedProject.id}`}
+                            className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1 font-medium"
+                          >
+                            Smart Allocation Studio →
+                          </NavLink>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {allocationRecs.map((rec) => (
+                            <div
+                              key={rec.id}
+                              className="p-4 bg-surface-800/60 rounded-xl border border-blue-500/30 flex flex-col justify-between hover:border-blue-500/50 transition-colors shadow-sm"
+                            >
+                              <div>
+                                <div className="flex justify-between items-start gap-2 mb-2">
+                                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-400 border-blue-500/20">
+                                    ALLOCATION OPPORTUNITY
+                                  </span>
+                                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${getConfidenceBadgeClass(rec.confidence)}`}>
+                                    {rec.confidence} Confidence
+                                  </span>
+                                </div>
+
+                                <h4 className="text-sm font-semibold text-surface-100">{rec.title}</h4>
+                                <p className="text-xs text-surface-300 mt-1.5 leading-relaxed">{rec.explanation}</p>
+
+                                <div className="mt-3 p-2.5 bg-surface-900/60 rounded-lg border border-surface-700/40 text-xs">
+                                  <span className="font-semibold text-primary-400">Why it matters: </span>
+                                  <span className="text-surface-300">{rec.why_it_matters}</span>
+                                </div>
+
+                                {rec.supporting_references && rec.supporting_references.length > 0 && (
+                                  <div className="mt-3 flex flex-wrap gap-1.5 items-center">
+                                    <span className="text-[11px] text-surface-500 mr-1">Evidence:</span>
+                                    {rec.supporting_references.map((ref, idx) => (
+                                      <NavLink
+                                        key={idx}
+                                        to={getReferenceLink(ref.type, ref.id)}
+                                        className="text-[11px] px-2 py-0.5 rounded bg-surface-700/60 text-surface-300 border border-surface-600/50 flex items-center gap-1 hover:border-primary-500/50 hover:text-primary-300 transition-colors"
+                                        title={`Inspect ${ref.type}: ${ref.label}`}
+                                      >
+                                        <span>{getReferenceIcon(ref.type)}</span>
+                                        <span className="truncate max-w-[180px]">{ref.label}</span>
+                                      </NavLink>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {rec.missing_info_or_assumptions && (
+                                  <p className="text-[11px] text-surface-500 mt-2.5 italic">
+                                    <span className="text-yellow-500/80 not-italic font-medium">Assumptions: </span>
+                                    {rec.missing_info_or_assumptions}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="mt-3 pt-2.5 border-t border-surface-700/30 flex justify-between items-center text-[10px] text-surface-500">
+                                <span>Method: {rec.confidence_rationale}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {/* OTHER DISTINCT RECOMMENDATIONS                               */}
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {otherRecs.length > 0 && (
+                      <div className="space-y-3 pt-1">
+                        <h4 className="text-sm font-bold text-surface-200 flex items-center gap-2 pb-1.5 border-b border-surface-800">
+                          <span>📌</span>
+                          <span>Additional Recovery Guidance</span>
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {otherRecs.map((rec) => (
+                            <div
+                              key={rec.id}
+                              className="p-4 bg-surface-800/60 rounded-xl border border-surface-700/60 flex flex-col justify-between hover:border-surface-600 transition-colors shadow-sm"
+                            >
+                              <div>
+                                <div className="flex justify-between items-start gap-2 mb-2">
+                                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${getCategoryBadgeClass(rec.category)}`}>
+                                    {rec.category.replace(/_/g, " ")}
+                                  </span>
+                                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${getConfidenceBadgeClass(rec.confidence)}`}>
+                                    {rec.confidence} Confidence
+                                  </span>
+                                </div>
+
+                                <h4 className="text-sm font-semibold text-surface-100">{rec.title}</h4>
+                                <p className="text-xs text-surface-300 mt-1.5 leading-relaxed">{rec.explanation}</p>
+
+                                <div className="mt-3 p-2.5 bg-surface-900/60 rounded-lg border border-surface-700/40 text-xs">
+                                  <span className="font-semibold text-primary-400">Why it matters: </span>
+                                  <span className="text-surface-300">{rec.why_it_matters}</span>
+                                </div>
+
+                                {rec.supporting_references && rec.supporting_references.length > 0 && (
+                                  <div className="mt-3 flex flex-wrap gap-1.5 items-center">
+                                    <span className="text-[11px] text-surface-500 mr-1">Evidence:</span>
+                                    {rec.supporting_references.map((ref, idx) => (
+                                      <NavLink
+                                        key={idx}
+                                        to={getReferenceLink(ref.type, ref.id)}
+                                        className="text-[11px] px-2 py-0.5 rounded bg-surface-700/60 text-surface-300 border border-surface-600/50 flex items-center gap-1 hover:border-primary-500/50 hover:text-primary-300 transition-colors"
+                                        title={`Inspect ${ref.type}: ${ref.label}`}
+                                      >
+                                        <span>{getReferenceIcon(ref.type)}</span>
+                                        <span className="truncate max-w-[180px]">{ref.label}</span>
+                                      </NavLink>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {rec.missing_info_or_assumptions && (
+                                  <p className="text-[11px] text-surface-500 mt-2.5 italic">
+                                    <span className="text-yellow-500/80 not-italic font-medium">Assumptions: </span>
+                                    {rec.missing_info_or_assumptions}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="mt-3 pt-2.5 border-t border-surface-700/30 flex justify-between items-center text-[10px] text-surface-500">
+                                <span>Method: {rec.confidence_rationale}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    {/* SHARED EXPANDABLE DETAILS: METHODOLOGY & HEALTH PENALTY RULES*/}
+                    {/* ─────────────────────────────────────────────────────────── */}
+                    <div className="rounded-xl border border-surface-700/60 bg-surface-900/60 overflow-hidden">
+                      <button
+                        onClick={() => setShowMethodology((prev) => !prev)}
+                        aria-expanded={showMethodology}
+                        className="w-full p-4 flex items-center justify-between text-left hover:bg-surface-800/40 transition-colors focus:outline-none"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">📐</span>
+                          <div>
+                            <h4 className="text-xs font-semibold text-surface-200">
+                              Calculation Methodology & Health Penalty Rules
+                            </h4>
+                            <p className="text-[11px] text-surface-400">
+                              Shared deterministic health penalty deductions, schedule calculation rules, and PM safeguards.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-primary-400 font-medium">
+                          <span>{showMethodology ? "Hide Details" : "View Details"}</span>
+                          <span className="font-mono text-[10px]">{showMethodology ? "▲" : "▼"}</span>
+                        </div>
+                      </button>
+
+                      {showMethodology && (
+                        <div className="p-4 pt-1 border-t border-surface-800/80 text-xs text-surface-300 space-y-3.5 bg-surface-950/30">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="p-3 rounded-lg bg-surface-800/50 border border-surface-700/50">
+                              <p className="font-semibold text-rose-300 mb-1 flex items-center gap-1.5">
+                                <span>🚨</span> Critical Risk Deduction
+                              </p>
+                              <p className="text-[11px] text-surface-400 leading-relaxed">
+                                Each unresolved Critical workflow risk incurs a deterministic <strong>-15 points</strong> penalty against the project health score until mitigated.
+                              </p>
+                            </div>
+
+                            <div className="p-3 rounded-lg bg-surface-800/50 border border-surface-700/50">
+                              <p className="font-semibold text-amber-300 mb-1 flex items-center gap-1.5">
+                                <span>⚠️</span> High Risk Deduction
+                              </p>
+                              <p className="text-[11px] text-surface-400 leading-relaxed">
+                                Each unresolved High workflow risk incurs a deterministic <strong>-10 points</strong> penalty until an approved mitigation plan is executed.
+                              </p>
+                            </div>
+
+                            <div className="p-3 rounded-lg bg-surface-800/50 border border-surface-700/50">
+                              <p className="font-semibold text-yellow-300 mb-1 flex items-center gap-1.5">
+                                <span>⏱️</span> Overdue Task Deduction
+                              </p>
+                              <p className="text-[11px] text-surface-400 leading-relaxed">
+                                Each unmitigated overdue task deducts <strong>-3 points</strong> based on deterministic comparison between target due date and UTC time.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-lg bg-surface-800/30 border border-surface-700/40 text-[11px] text-surface-400 space-y-1.5">
+                            <p>
+                              <strong className="text-surface-300">Smart Allocation Scoring Formula:</strong> Candidate matching computes a weighted compatibility score based on Skill Alignment (50%), Historical Experience (20%), Active Workload (20%), and Delivery History (10%).
+                            </p>
+                            <p>
+                              <strong className="text-surface-300">PM Advisory Safeguard:</strong> DevFlow recommendations are strictly advisory for human review. DevFlow never automatically reassigns developers, modifies task deadlines, or alters risk statuses without project manager confirmation.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 {/* Non-destructive advisory notice */}
-                <div className="p-3 bg-surface-800/30 rounded-lg border border-surface-700/30 text-[11px] text-surface-400 flex items-center justify-between">
+                <div className="p-3 bg-surface-800/30 rounded-lg border border-surface-700/30 text-[11px] text-surface-400 flex flex-wrap items-center justify-between gap-2">
                   <span>
                     💡 <strong>PM Advisory Safeguard:</strong> Recommendations are advisory. DevFlow never automatically reassigns developers, modifies task deadlines, or alters risk statuses without project manager confirmation.
                   </span>
-                  <span className="text-[10px] text-surface-500 shrink-0 ml-4">
-                    Health Score: {recommendations.health_score}/100 (Uncompromised)
+                  <span className="text-[10px] text-surface-400 shrink-0 font-medium">
+                    Health Score: <span className="text-surface-100 font-bold">{recommendations.health_score}/100</span> (Uncompromised)
                   </span>
                 </div>
               </div>

@@ -213,9 +213,21 @@ export default function AdminTasksPage() {
     if (initialProjectId) {
       setProjectFilter(initialProjectId);
     }
+    const taskParam = params.get("task") || params.get("taskId");
 
     Promise.all([fetchAllTasks(), fetchAllProjects(), fetchAllUsers()])
-      .then(([t, p, u]) => { setTasks(t); setProjects(p); setUsers(u); })
+      .then(([t, p, u]) => {
+        setTasks(t);
+        setProjects(p);
+        setUsers(u);
+        if (taskParam) {
+          const found = t.find((item) => item.id === taskParam);
+          if (found) {
+            setEditing(found);
+            setModal("edit");
+          }
+        }
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load"))
       .finally(() => setLoading(false));
   };

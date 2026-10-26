@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetchAllTasks, fetchAllProjects, fetchRecentActivity } from "../../services/adminService";
 import type { Task, Project, ActivityLog } from "../../types";
 
 export default function DeveloperDashboard() {
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activity, setActivity] = useState<ActivityLog[]>([]);
@@ -113,8 +115,16 @@ export default function DeveloperDashboard() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {projects.slice(0, 4).map(p => (
-            <div key={p.id} className="glass-card p-4 hover:bg-surface-800/50 transition-colors">
-              <h4 className="text-surface-100 font-medium">{p.name}</h4>
+            <div
+              key={p.id}
+              onClick={() => navigate(`/dashboard/projects/${p.id}`)}
+              className="glass-card p-4 hover:bg-surface-800/50 transition-colors cursor-pointer group"
+              title={`View details for ${p.name}`}
+            >
+              <div className="flex items-start justify-between">
+                <h4 className="text-surface-100 font-medium group-hover:text-primary-400 transition-colors">{p.name}</h4>
+                <span className="text-[11px] text-primary-400 font-medium group-hover:underline">View Details →</span>
+              </div>
               <p className="text-surface-400 text-xs line-clamp-1 mt-1">{p.description || "No description"}</p>
               <div className="mt-3 flex items-center justify-between">
                 <span className="badge bg-surface-700/50 border-surface-600/30">{p.status.replace("_", " ")}</span>

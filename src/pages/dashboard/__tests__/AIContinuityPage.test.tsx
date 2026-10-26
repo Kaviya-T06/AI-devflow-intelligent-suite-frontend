@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import AIContinuityPage from "../AIContinuityPage";
@@ -380,9 +380,12 @@ describe("AIContinuityPage", () => {
       expect(screen.getByText(/Charlie is working on the Telemetry engine/i)).toBeInTheDocument();
     });
 
-    // Acceptance criteria 4: The 4 handover boxes remain accessible post-interaction
-    expect(screen.getByText("4 Handover Boxes")).toBeInTheDocument();
-    const viewBoxesBtn = screen.getByText("View 4 Handover Boxes");
+    // Verify the "4 Handover Boxes" strip below the generated summary is removed
+    expect(screen.queryByText("4 Handover Boxes")).not.toBeInTheDocument();
+    expect(screen.queryByText("View 4 Handover Boxes")).not.toBeInTheDocument();
+
+    // Handover intelligence remains accessible via the header toggle
+    const viewBoxesBtn = screen.getByText("View Handover Intelligence");
     fireEvent.click(viewBoxesBtn);
 
     // Verify all 4 boxes are rendered with full project data

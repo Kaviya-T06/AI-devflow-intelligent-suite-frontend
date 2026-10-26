@@ -148,11 +148,11 @@ export default function NotificationsPage() {
 
     if (n.task_id) {
       if (role === "DEVELOPER") {
-        navigate("/dashboard/my-tasks");
+        navigate(n.project_id ? `/dashboard/my-tasks?project=${n.project_id}&task=${n.task_id}` : `/dashboard/my-tasks?task=${n.task_id}`);
       } else if (role === "MANAGER") {
-        navigate("/dashboard/pm-team-tasks");
+        navigate(n.project_id ? `/dashboard/pm-team-tasks?project=${n.project_id}&task=${n.task_id}` : `/dashboard/pm-team-tasks?task=${n.task_id}`);
       } else {
-        navigate("/dashboard/tasks");
+        navigate(n.project_id ? `/dashboard/tasks?project_id=${n.project_id}&task=${n.task_id}` : `/dashboard/tasks?task=${n.task_id}`);
       }
     } else if (n.project_id) {
       if (role === "DEVELOPER") {
@@ -276,6 +276,71 @@ export default function NotificationsPage() {
       return dt.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
     } catch {
       return isoString;
+    }
+  };
+
+  const getNotificationTitle = (n: Notification): string => {
+    if (n.type === "TASK_OVERDUE") {
+      if (n.project_name) {
+        return `Overdue Task — ${n.project_name}`;
+      }
+      if (n.title && n.title.startsWith("Overdue Task — ")) {
+        return n.title;
+      }
+      return "Overdue Task — Project name unavailable";
+    }
+    return n.title;
+  };
+
+  const getOverdueDetails = (n: Notification) => {
+    let taskTitle = n.task_title || "";
+    let assignedDev = n.assigned_to_name || "";
+    let dueDateStr = n.due_date || "";
+
+    if (!taskTitle) {
+      const match = n.message.match(/Task:?\s*['"]?([^'".\n]+)['"]?/i);
+      if (match) taskTitle = match[1].trim();
+    }
+    if (!assignedDev) {
+      const devMatch = n.message.match(/Assigned to\s+([^.\n•]+)/i);
+      if (devMatch && !devMatch[1].toLowerCase().includes("developer")) {
+        assignedDev = devMatch[1].trim();
+      }
+    }
+    if (!dueDateStr) {
+      const dueMatch = n.message.match(/due(?: date)? (?:on |was )?(\d{4}-\d{2}-\d{2})/i);
+      if (dueMatch) dueDateStr = dueMatch[1].trim();
+    }
+
+    // Calculate days overdue dynamically using actual due date and current date
+    let daysOverdue = n.days_overdue;
+    if (dueDateStr) {
+      try {
+        const due = new Date(dueDateStr);
+        const now = new Date();
+        due.setHours(0, 0, 0, 0);
+        now.setHours(0, 0, 0, 0);
+        const diffDays = Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+        daysOverdue = Math.max(1, diffDays);
+      } catch {
+        daysOverdue = daysOverdue ?? 1;
+      }
+    }
+
+    return {
+      taskTitle: taskTitle || "Untitled Task",
+      assignedDev: assignedDev || null,
+      dueDateStr: dueDateStr || null,
+      daysOverdue: daysOverdue ?? 1,
+    };
+  };
+
+  const formatDueDate = (dateStr: string): string => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return dateStr;
     }
   };
 
@@ -444,7 +509,7 @@ export default function NotificationsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h4 className={`text-sm truncate ${!n.is_read ? "font-semibold text-surface-100" : "font-medium text-surface-300"}`}>
-                      {n.title}
+                      {getNotificationTitle(n)}
                     </h4>
                     {!n.is_read ? (
                       <span className="w-2 h-2 rounded-full bg-primary-400 shrink-0" title="Unread" />
@@ -454,9 +519,42 @@ export default function NotificationsPage() {
                       </span>
                     )}
                   </div>
-                  <p className={`text-xs mt-1 leading-relaxed ${!n.is_read ? "text-surface-300" : "text-surface-400"}`}>
-                    {n.message}
-                  </p>
+
+                  {n.type === "TASK_OVERDUE" ? (() => {
+                    const { taskTitle, assignedDev, dueDateStr, daysOverdue } = getOverdueDetails(n);
+                    return (
+                      <div className="mt-1 space-y-1 text-xs">
+                        <div className="font-medium text-surface-200 flex items-center gap-1.5">
+                          <span className="text-surface-400 font-normal">Task:</span>
+                          <span className="font-semibold text-surface-100">{taskTitle}</span>
+                        </div>
+                        {assignedDev && (
+                          <div className="text-surface-300 flex items-center gap-1.5">
+                            <span className="text-surface-400 font-normal">Assigned to:</span>
+                            <span className="font-medium text-surface-200">{assignedDev}</span>
+                          </div>
+                        )}
+                        {dueDateStr ? (
+                          <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                            <span className="text-surface-400">Due date:</span>
+                            <span className="text-surface-300 font-medium">{formatDueDate(dueDateStr)}</span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-red-500/15 text-red-400 border border-red-500/25">
+                              ⚠️ {daysOverdue} {daysOverdue === 1 ? "day" : "days"} overdue
+                            </span>
+                          </div>
+                        ) : (
+                          <p className={`mt-0.5 leading-relaxed ${!n.is_read ? "text-surface-300" : "text-surface-400"}`}>
+                            {n.message}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })() : (
+                    <p className={`text-xs mt-1 leading-relaxed ${!n.is_read ? "text-surface-300" : "text-surface-400"}`}>
+                      {n.message}
+                    </p>
+                  )}
+
                   <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-surface-500 mt-2">
                     <span>{formatDate(n.created_at)}</span>
                     {n.read_at && (
@@ -469,7 +567,13 @@ export default function NotificationsPage() {
                         View GitHub Branch →
                       </span>
                     ) : n.task_id ? (
-                      <span className="hover:text-primary-400 font-medium">
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNavigateToTarget(n);
+                        }}
+                        className="text-primary-400 hover:text-primary-300 font-medium cursor-pointer"
+                      >
                         View Task →
                       </span>
                     ) : n.project_id ? (

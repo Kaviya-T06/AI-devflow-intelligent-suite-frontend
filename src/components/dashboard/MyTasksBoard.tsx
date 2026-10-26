@@ -123,6 +123,16 @@ export default function MyTasksBoard() {
   }, [projectParam]);
 
   useEffect(() => {
+    const taskParam = searchParams.get("task") || searchParams.get("taskId");
+    if (taskParam && tasks.length > 0) {
+      const found = tasks.find((t) => t.id === taskParam);
+      if (found) {
+        setSelectedTask(found);
+      }
+    }
+  }, [searchParams, tasks]);
+
+  useEffect(() => {
     loadData();
   }, []);
 

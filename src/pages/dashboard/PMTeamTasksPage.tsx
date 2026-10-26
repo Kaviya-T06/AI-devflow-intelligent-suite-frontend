@@ -603,6 +603,16 @@ export default function PMTeamTasksPage() {
     }
   }, [projectFilter]);
 
+  useEffect(() => {
+    const taskParam = searchParams.get("task") || searchParams.get("taskId");
+    if (taskParam && tasks.length > 0) {
+      const found = tasks.find((t) => t.id === taskParam);
+      if (found) {
+        setEditingTask(found);
+      }
+    }
+  }, [searchParams, tasks]);
+
   const handleAssignFromRecommendation = async (developerId: string) => {
     if (!recommendingTask) return;
     await updateManagedTask(recommendingTask.id, { assigned_to: developerId });
